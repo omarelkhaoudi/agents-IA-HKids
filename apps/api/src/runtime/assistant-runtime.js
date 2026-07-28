@@ -37,6 +37,7 @@ import { SemanticRetriever } from '../services/retrieval/SemanticRetriever.js';
 const databasePool = createDatabasePool({
   connectionString: env.databaseUrl,
   sslEnabled: env.dbSsl,
+  allowInMemory: env.nodeEnv === 'development' && !env.databaseUrl,
 });
 export const persistenceService = new PersistenceService(databasePool, {
   listDocuments,
