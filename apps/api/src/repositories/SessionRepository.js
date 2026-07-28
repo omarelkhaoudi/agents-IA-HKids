@@ -39,6 +39,34 @@ export class SessionRepository {
     this.promptRepository = promptRepository;
   }
 
+  buildSession(
+    conversation,
+    messages,
+    generatedDocuments,
+    selectedDocumentIds,
+    selectedPromptId
+  ) {
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      createdAt: conversation.created_at.toISOString(),
+      updatedAt: conversation.updated_at.toISOString(),
+      agentCode: conversation.agent_code,
+      selectedPromptId,
+      selectedDocumentIds,
+      currentContext: conversation.current_context,
+      model: conversation.model,
+      provider: conversation.provider,
+      messages: messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: formatMessageTimestamp(message.created_at),
+      })),
+      generatedDocuments: generatedDocuments.map(mapGeneratedDocument),
+    };
+  }
+
   async createSession(payload) {
     await this.conversationRepository.create({
       id: payload.id,
@@ -93,29 +121,39 @@ export class SessionRepository {
       this.promptRepository.getSelectedPromptId(conversationId),
     ]);
 
-    return {
-      id: conversation.id,
-      title: conversation.title,
-      createdAt: conversation.created_at.toISOString(),
-      updatedAt: conversation.updated_at.toISOString(),
-      agentCode: conversation.agent_code,
-      selectedPromptId,
+    return this.buildSession(
+      conversation,
+      messages,
+      generatedDocuments,
       selectedDocumentIds,
-      currentContext: conversation.current_context,
-      model: conversation.model,
-      provider: conversation.provider,
-      messages: messages.map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        createdAt: formatMessageTimestamp(message.created_at),
-      })),
-      generatedDocuments: generatedDocuments.map(mapGeneratedDocument),
-    };
+      selectedPromptId
+    );
   }
 
   async listSessions({ limit = 20, offset = 0, search = '', agentCode } = {}) {
     const conversations = await this.conversationRepository.list({ limit, offset, search, agentCode });
-    return Promise.all(conversations.map((conversation) => this.getSessionById(conversation.id)));
+
+    if (conversations.length === 0) {
+      return [];
+    }
+
+    const conversationIds = conversations.map((conversation) => conversation.id);
+    const [messagesByConversation, documentsByConversation, knowledgeByConversation, promptsByConversation] =
+      await Promise.all([
+        this.messageRepository.listGroupedByConversationIds(conversationIds),
+        this.generatedDocumentRepository.listGroupedByConversationIds(conversationIds),
+        this.knowledgeRepository.listGroupedConversationKnowledgeIds(conversationIds),
+        this.promptRepository.listGroupedSelectedPromptIds(conversationIds),
+      ]);
+
+    return conversations.map((conversation) =>
+      this.buildSession(
+        conversation,
+        messagesByConversation.get(conversation.id) || [],
+        documentsByConversation.get(conversation.id) || [],
+        knowledgeByConversation.get(conversation.id) || [],
+        promptsByConversation.get(conversation.id) || null
+      )
+    );
   }
 }

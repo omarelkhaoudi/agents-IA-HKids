@@ -33,10 +33,29 @@ export class RetrievalService {
     this.documents = documents;
     this.rawSources = rawSources;
     this.index = [];
+    this.refreshTimer = null;
     this.refreshIndex();
   }
 
+  scheduleRefreshIndex(delayMs = 300) {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.refreshIndex();
+    }, delayMs);
+
+    return this.index;
+  }
+
   refreshIndex() {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
     this.index = this.documentIndexer.indexDocuments(this.documents(), this.rawSources());
     this.embeddingIndex.rebuild(
       this.index.flatMap((document) => document.chunks),

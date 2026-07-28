@@ -9,12 +9,14 @@
     "dev": "concurrently \"npm run dev -w @hkids/web\" \"npm run dev -w @hkids/api\"",
     "build": "npm run build -w @hkids/web && npm run build -w @hkids/api",
     "lint": "npm run lint -w @hkids/web && npm run lint -w @hkids/api",
-    "test": "npm run test -w @hkids/api",
+    "test": "npm run test -w @hkids/api && npm run test -w @hkids/web",
+    "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.55.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "concurrently": "^9.2.1",

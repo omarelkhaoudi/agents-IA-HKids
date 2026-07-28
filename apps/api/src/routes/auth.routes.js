@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate.js';
+import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { validate } from '../middleware/validate.js';
 import { authService } from '../runtime/auth-runtime.js';
 import { loginBodySchema, logoutBodySchema, refreshTokenBodySchema } from '../validation/schemas.js';
 
 const authRouter = Router();
 
-authRouter.post('/auth/login', validate({ body: loginBodySchema }), async (request, response) => {
+authRouter.post('/auth/login', authRateLimiter, validate({ body: loginBodySchema }), async (request, response) => {
   try {
     const result = await authService.login({
       email: request.body?.email,
@@ -20,7 +21,7 @@ authRouter.post('/auth/login', validate({ body: loginBodySchema }), async (reque
   }
 });
 
-authRouter.post('/auth/refresh', validate({ body: refreshTokenBodySchema }), async (request, response) => {
+authRouter.post('/auth/refresh', authRateLimiter, validate({ body: refreshTokenBodySchema }), async (request, response) => {
   try {
     const result = await authService.refresh(request.body?.refreshToken);
     response.json(result);

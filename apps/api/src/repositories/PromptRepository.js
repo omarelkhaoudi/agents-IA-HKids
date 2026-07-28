@@ -1,3 +1,5 @@
+import { buildInClause } from './queryUtils.js';
+
 export class PromptRepository {
   constructor(pool, { listPrompts }) {
     this.pool = pool;
@@ -22,6 +24,37 @@ export class PromptRepository {
     );
 
     return result.rows[0]?.prompt_id || null;
+  }
+
+  async listGroupedSelectedPromptIds(conversationIds = []) {
+    if (conversationIds.length === 0) {
+      return new Map();
+    }
+
+    const { clause, values } = buildInClause(conversationIds);
+    const result = await this.pool.query(
+      `
+        SELECT conversation_id, prompt_id, created_at
+        FROM conversation_prompts
+        WHERE conversation_id ${clause}
+        ORDER BY created_at DESC
+      `,
+      values
+    );
+
+    const grouped = new Map();
+
+    for (const conversationId of conversationIds) {
+      grouped.set(conversationId, null);
+    }
+
+    for (const row of result.rows) {
+      if (!grouped.get(row.conversation_id)) {
+        grouped.set(row.conversation_id, row.prompt_id);
+      }
+    }
+
+    return grouped;
   }
 
   getPromptById(promptId) {

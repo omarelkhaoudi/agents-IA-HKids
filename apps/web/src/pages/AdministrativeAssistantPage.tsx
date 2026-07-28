@@ -388,6 +388,13 @@ export default function AdministrativeAssistantPage() {
       return;
     }
 
+    const cachedSession = sessions.find((session) => session.id === sessionId);
+    if (cachedSession) {
+      setSelectedSession(cachedSession);
+      syncSessionConfiguration(cachedSession, bootstrap.defaultContext);
+      return;
+    }
+
     const session = await getConversationSession(sessionId);
     setSelectedSession(session);
     syncSessionConfiguration(session, bootstrap.defaultContext);
@@ -415,7 +422,17 @@ export default function AdministrativeAssistantPage() {
 
       setSelectedSession(response.session);
       setRequestPreview(response.requestPreview);
-      await refreshSessions(selectedAgentCode);
+      setSessions((currentSessions) => {
+        const existingIndex = currentSessions.findIndex((session) => session.id === response.session.id);
+
+        if (existingIndex === -1) {
+          return [response.session, ...currentSessions];
+        }
+
+        const nextSessions = [...currentSessions];
+        nextSessions[existingIndex] = response.session;
+        return nextSessions;
+      });
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : 'Unable to send the message.');
     } finally {
@@ -443,7 +460,11 @@ export default function AdministrativeAssistantPage() {
 
     const session = await getConversationSession(selectedSession.id);
     setSelectedSession(session);
-    await refreshSessions(selectedAgentCode);
+    setSessions((currentSessions) =>
+      currentSessions.map((currentSession) =>
+        currentSession.id === session.id ? session : currentSession
+      )
+    );
   };
 
   return (

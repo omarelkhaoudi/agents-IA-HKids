@@ -1,8 +1,12 @@
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
 import { env } from './config/env.js';
 import { authenticate } from './middleware/authenticate.js';
 import { authorizeAccess } from './middleware/authorize.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { apiRateLimiter } from './middleware/rateLimiter.js';
+import { requestLogger } from './middleware/requestLogger.js';
 import aiRouter from './routes/ai.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import assistantRouter from './routes/assistant.routes.js';
@@ -20,12 +24,16 @@ const protectedMiddleware = [authenticate, authorizeAccess];
 export function createApp() {
   const app = express();
 
+  app.disable('x-powered-by');
+  app.use(helmet());
+  app.use(requestLogger);
   app.use(
     cors({
       origin: env.clientUrl,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     })
   );
-  app.use(express.json());
+  app.use(express.json({ limit: env.jsonBodyLimit }));
 
   app.get('/', (_request, response) => {
     response.json({
@@ -34,6 +42,7 @@ export function createApp() {
     });
   });
 
+  app.use('/api', apiRateLimiter);
   app.use('/api', healthRouter);
   app.use('/api', authRouter);
   app.use('/api', protectedMiddleware, adminRouter);
@@ -45,6 +54,9 @@ export function createApp() {
   app.use('/api', protectedMiddleware, promptsRouter);
   app.use('/api', protectedMiddleware, retrievalRouter);
   app.use('/api', protectedMiddleware, workflowRouter);
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }

@@ -3,7 +3,9 @@ import { initializeContentRuntime } from './runtime/content-runtime.js';
 import { initializeAdminRuntime } from './runtime/admin-runtime.js';
 import { workflowEngine } from './runtime/workflow-runtime.js';
 import { startServer } from './server.js';
+import { assertProductionConfig } from './config/env.js';
 
+assertProductionConfig();
 await initializeAuthRuntime();
 await initializeContentRuntime();
 await workflowEngine.initialize();

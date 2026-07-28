@@ -1,3 +1,5 @@
+import { buildInClause } from './queryUtils.js';
+
 export class MessageRepository {
   constructor(pool) {
     this.pool = pool;
@@ -35,5 +37,33 @@ export class MessageRepository {
     );
 
     return result.rows;
+  }
+
+  async listGroupedByConversationIds(conversationIds = []) {
+    if (conversationIds.length === 0) {
+      return new Map();
+    }
+
+    const { clause, values } = buildInClause(conversationIds);
+    const result = await this.pool.query(
+      `
+        SELECT * FROM messages
+        WHERE conversation_id ${clause}
+        ORDER BY created_at ASC
+      `,
+      values
+    );
+
+    const grouped = new Map();
+
+    for (const conversationId of conversationIds) {
+      grouped.set(conversationId, []);
+    }
+
+    for (const row of result.rows) {
+      grouped.get(row.conversation_id).push(row);
+    }
+
+    return grouped;
   }
 }

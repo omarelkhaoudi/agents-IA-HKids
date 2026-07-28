@@ -1,3 +1,5 @@
+import { buildInClause } from './queryUtils.js';
+
 export class GeneratedDocumentRepository {
   constructor(pool) {
     this.pool = pool;
@@ -108,6 +110,34 @@ export class GeneratedDocumentRepository {
     );
 
     return result.rows;
+  }
+
+  async listGroupedByConversationIds(conversationIds = []) {
+    if (conversationIds.length === 0) {
+      return new Map();
+    }
+
+    const { clause, values } = buildInClause(conversationIds);
+    const result = await this.pool.query(
+      `
+        SELECT * FROM generated_documents
+        WHERE conversation_id ${clause}
+        ORDER BY created_at DESC
+      `,
+      values
+    );
+
+    const grouped = new Map();
+
+    for (const conversationId of conversationIds) {
+      grouped.set(conversationId, []);
+    }
+
+    for (const row of result.rows) {
+      grouped.get(row.conversation_id).push(row);
+    }
+
+    return grouped;
   }
 
   async search(query, { limit = 50, offset = 0, agentCode } = {}) {

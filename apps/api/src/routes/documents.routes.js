@@ -19,7 +19,7 @@ documentsRouter.get('/documents', (_request, response) => {
 
 documentsRouter.post('/documents', validate({ body: documentBodySchema }), async (request, response) => {
   const document = await createDocument(request.body);
-  retrievalService.refreshIndex();
+  retrievalService.scheduleRefreshIndex();
   response.status(201).json(document);
 });
 
@@ -34,7 +34,7 @@ documentsRouter.put(
       return;
     }
 
-    retrievalService.refreshIndex();
+    retrievalService.scheduleRefreshIndex();
     response.json(document);
   }
 );
@@ -47,7 +47,7 @@ documentsRouter.delete('/documents/:id', validate({ params: idParamsSchema }), a
     return;
   }
 
-  retrievalService.refreshIndex();
+  retrievalService.scheduleRefreshIndex();
   response.status(204).send();
 });
 

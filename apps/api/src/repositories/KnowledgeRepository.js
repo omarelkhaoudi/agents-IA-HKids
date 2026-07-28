@@ -1,3 +1,5 @@
+import { buildInClause } from './queryUtils.js';
+
 export class KnowledgeRepository {
   constructor(pool, { listDocuments }) {
     this.pool = pool;
@@ -26,6 +28,35 @@ export class KnowledgeRepository {
     );
 
     return result.rows.map((row) => row.document_id);
+  }
+
+  async listGroupedConversationKnowledgeIds(conversationIds = []) {
+    if (conversationIds.length === 0) {
+      return new Map();
+    }
+
+    const { clause, values } = buildInClause(conversationIds);
+    const result = await this.pool.query(
+      `
+        SELECT conversation_id, document_id
+        FROM conversation_knowledge
+        WHERE conversation_id ${clause}
+        ORDER BY created_at ASC
+      `,
+      values
+    );
+
+    const grouped = new Map();
+
+    for (const conversationId of conversationIds) {
+      grouped.set(conversationId, []);
+    }
+
+    for (const row of result.rows) {
+      grouped.get(row.conversation_id).push(row.document_id);
+    }
+
+    return grouped;
   }
 
   getDocumentsByIds(documentIds) {

@@ -38,4 +38,37 @@ export const env = {
   embeddingProvider: process.env.EMBEDDING_PROVIDER || 'mock',
   embeddingModel: process.env.EMBEDDING_MODEL || 'mock-hash-v1',
   openAiApiKey: process.env.OPENAI_API_KEY || '',
+  jsonBodyLimit: process.env.JSON_BODY_LIMIT || '1mb',
+  rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 300),
+  authRateLimitWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 20),
 };
+
+export function assertProductionConfig() {
+  if (env.nodeEnv !== 'production') {
+    return;
+  }
+
+  const missing = [];
+
+  if (!env.jwtSecret) {
+    missing.push('JWT_SECRET');
+  }
+
+  if (!env.databaseUrl) {
+    missing.push('DATABASE_URL');
+  }
+
+  if (!env.clientUrl || env.clientUrl.includes('localhost')) {
+    missing.push('CLIENT_URL');
+  }
+
+  if (env.defaultAdminPassword === 'Admin123!') {
+    missing.push('DEFAULT_ADMIN_PASSWORD (must be changed in production)');
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing or unsafe production configuration: ${missing.join(', ')}`);
+  }
+}
