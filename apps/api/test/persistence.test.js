@@ -39,6 +39,11 @@ test('migrations create persistence tables', async () => {
   await pool.query('SELECT * FROM workflow_comments');
   await pool.query('SELECT * FROM workflow_assignments');
   await pool.query('SELECT * FROM ai_usage');
+  await pool.query('SELECT * FROM agents');
+  await pool.query('SELECT * FROM system_settings');
+  await pool.query('SELECT * FROM agent_prompt_links');
+  await pool.query('SELECT * FROM agent_document_links');
+  await pool.query('SELECT * FROM agent_workflow_links');
   assert.ok(true);
 });
 

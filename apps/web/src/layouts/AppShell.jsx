@@ -7,6 +7,7 @@ const navigationItems = [
   { to: '/prompt-builder', label: 'Prompt Builder' },
   { to: '/feedback-dashboard', label: 'Feedback Dashboard' },
   { to: '/ai-administration', label: 'Administration IA' },
+  { to: '/administration', label: 'Administration' },
 ];
 
 export default function AppShell() {
