@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newDb } from 'pg-mem';
 import { runMigrations } from '../src/database/runMigrations.js';
-import { listDocuments } from '../src/data/mock-documents.js';
-import { listPrompts } from '../src/data/mock-prompts.js';
+import { ContentCatalogService } from '../src/services/content/ContentCatalogService.js';
 import { ConversationRepository } from '../src/repositories/ConversationRepository.js';
 import { GeneratedDocumentRepository } from '../src/repositories/GeneratedDocumentRepository.js';
 import { KnowledgeRepository } from '../src/repositories/KnowledgeRepository.js';
@@ -19,7 +18,14 @@ async function createTestPool() {
   const { Pool } = db.adapters.createPg();
   const pool = new Pool();
   await runMigrations(pool);
+  const catalog = new ContentCatalogService(pool);
+  await catalog.initialize();
+  pool.catalog = catalog;
   return pool;
+}
+
+function getCatalog(pool) {
+  return pool.catalog;
 }
 
 test('migrations create persistence tables', async () => {
@@ -44,11 +50,18 @@ test('migrations create persistence tables', async () => {
   await pool.query('SELECT * FROM agent_prompt_links');
   await pool.query('SELECT * FROM agent_document_links');
   await pool.query('SELECT * FROM agent_workflow_links');
+  await pool.query('SELECT * FROM users');
+  await pool.query('SELECT * FROM refresh_tokens');
+  await pool.query('SELECT * FROM knowledge_documents');
+  await pool.query('SELECT * FROM prompt_definitions');
   assert.ok(true);
 });
 
 test('repositories persist and hydrate a conversation session', async () => {
   const pool = await createTestPool();
+  const catalog = getCatalog(pool);
+  const listDocuments = () => catalog.listDocuments();
+  const listPrompts = () => catalog.listPrompts();
   const conversationRepository = new ConversationRepository(pool);
   const messageRepository = new MessageRepository(pool);
   const generatedDocumentRepository = new GeneratedDocumentRepository(pool);
@@ -110,6 +123,9 @@ test('repositories persist and hydrate a conversation session', async () => {
 
 test('conversation service integrates with repositories', async () => {
   const pool = await createTestPool();
+  const catalog = getCatalog(pool);
+  const listDocuments = () => catalog.listDocuments();
+  const listPrompts = () => catalog.listPrompts();
   const conversationRepository = new ConversationRepository(pool);
   const messageRepository = new MessageRepository(pool);
   const generatedDocumentRepository = new GeneratedDocumentRepository(pool);

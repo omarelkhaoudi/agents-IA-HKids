@@ -1,18 +1,19 @@
 import { Router } from 'express';
+import { validate } from '../middleware/validate.js';
 import { retrievalService } from '../runtime/assistant-runtime.js';
+import { retrievalSearchBodySchema } from '../validation/schemas.js';
 
 const retrievalRouter = Router();
 
-retrievalRouter.post('/retrieval/search', (request, response) => {
-  const question = request.body.question || '';
-
-  if (!question.trim()) {
-    response.status(400).json({ message: 'Question is required.' });
-    return;
+retrievalRouter.post('/retrieval/search', validate({ body: retrievalSearchBodySchema }), (request, response) => {
+  try {
+    const result = retrievalService.retrieveRelevantContext(request.body.question);
+    response.json(result);
+  } catch (error) {
+    response.status(400).json({
+      message: error instanceof Error ? error.message : 'Unable to search retrieval context.',
+    });
   }
-
-  const result = retrievalService.retrieveRelevantContext(question);
-  response.json(result);
 });
 
 export default retrievalRouter;

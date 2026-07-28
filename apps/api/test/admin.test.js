@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newDb } from 'pg-mem';
 import { runMigrations } from '../src/database/runMigrations.js';
-import { listDocuments } from '../src/data/mock-documents.js';
-import { listPrompts } from '../src/data/mock-prompts.js';
+import { ContentCatalogService } from '../src/services/content/ContentCatalogService.js';
 import { AgentRepository } from '../src/repositories/AgentRepository.js';
 import { AdminStatsRepository } from '../src/repositories/AdminStatsRepository.js';
 import { SystemSettingsRepository } from '../src/repositories/SystemSettingsRepository.js';
@@ -17,6 +16,10 @@ async function createAdminStack() {
   const { Pool } = db.adapters.createPg();
   const pool = new Pool();
   await runMigrations(pool);
+  const catalog = new ContentCatalogService(pool);
+  await catalog.initialize();
+  const listDocuments = () => catalog.listDocuments();
+  const listPrompts = () => catalog.listPrompts();
 
   const agentRepository = new AgentRepository(pool);
   const systemSettingsRepository = new SystemSettingsRepository(pool);

@@ -12,6 +12,7 @@ import { variablesByAction } from '../../data/assistant';
 import type { DocumentKind } from '../../types/assistant';
 import type { AssistantContext, AssistantSession } from '../../types/assistant-runtime';
 import type { WorkflowData } from '../../types/workflow';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import Button from '../ui/Button';
 import Panel from '../ui/Panel';
 
@@ -544,9 +545,7 @@ export default function DocumentReviewWorkspace({
             <div
               className="mt-4 min-h-[720px] overflow-hidden rounded-3xl border border-white/10 bg-white"
               dangerouslySetInnerHTML={{
-                __html:
-                  selectedDocument?.renderedPreview ||
-                  '<div style="padding:32px;font-family:Arial,sans-serif;color:#334155;">Generate a document draft from an assistant response to review it here.</div>',
+                __html: sanitizeHtml(selectedDocument?.renderedPreview || ''),
               }}
             />
           </section>

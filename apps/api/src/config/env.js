@@ -10,12 +10,22 @@ dotenv.config({
   path: [path.join(apiRoot, '.env.local'), path.join(apiRoot, '.env')],
 });
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+
 export const env = {
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   port: Number(process.env.PORT || 3001),
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   databaseUrl: process.env.DATABASE_URL || '',
   dbSsl: process.env.DB_SSL === 'true',
+  jwtSecret:
+    process.env.JWT_SECRET ||
+    (nodeEnv === 'development' ? 'dev-only-jwt-secret-change-in-production' : ''),
+  jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  jwtRefreshExpiresInMs: Number(process.env.JWT_REFRESH_EXPIRES_IN_MS || 7 * 24 * 60 * 60 * 1000),
+  defaultAdminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'admin@hkids.app',
+  defaultAdminPassword: process.env.DEFAULT_ADMIN_PASSWORD || 'Admin123!',
+  defaultAdminName: process.env.DEFAULT_ADMIN_NAME || 'H-Kids Administrator',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   defaultProvider: process.env.DEFAULT_PROVIDER || 'anthropic',
   defaultModel: process.env.DEFAULT_MODEL || 'claude-3-5-sonnet-latest',

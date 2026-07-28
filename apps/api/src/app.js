@@ -1,9 +1,12 @@
 import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
+import { authenticate } from './middleware/authenticate.js';
+import { authorizeAccess } from './middleware/authorize.js';
 import aiRouter from './routes/ai.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import assistantRouter from './routes/assistant.routes.js';
+import authRouter from './routes/auth.routes.js';
 import documentsRouter from './routes/documents.routes.js';
 import feedbackRouter from './routes/feedback.routes.js';
 import generatedDocumentsRouter from './routes/generated-documents.routes.js';
@@ -11,6 +14,8 @@ import healthRouter from './routes/health.routes.js';
 import promptsRouter from './routes/prompts.routes.js';
 import retrievalRouter from './routes/retrieval.routes.js';
 import workflowRouter from './routes/workflow.routes.js';
+
+const protectedMiddleware = [authenticate, authorizeAccess];
 
 export function createApp() {
   const app = express();
@@ -30,15 +35,16 @@ export function createApp() {
   });
 
   app.use('/api', healthRouter);
-  app.use('/api', adminRouter);
-  app.use('/api', aiRouter);
-  app.use('/api', assistantRouter);
-  app.use('/api', documentsRouter);
-  app.use('/api', feedbackRouter);
-  app.use('/api', generatedDocumentsRouter);
-  app.use('/api', promptsRouter);
-  app.use('/api', retrievalRouter);
-  app.use('/api', workflowRouter);
+  app.use('/api', authRouter);
+  app.use('/api', protectedMiddleware, adminRouter);
+  app.use('/api', protectedMiddleware, aiRouter);
+  app.use('/api', protectedMiddleware, assistantRouter);
+  app.use('/api', protectedMiddleware, documentsRouter);
+  app.use('/api', protectedMiddleware, feedbackRouter);
+  app.use('/api', protectedMiddleware, generatedDocumentsRouter);
+  app.use('/api', protectedMiddleware, promptsRouter);
+  app.use('/api', protectedMiddleware, retrievalRouter);
+  app.use('/api', protectedMiddleware, workflowRouter);
 
   return app;
 }

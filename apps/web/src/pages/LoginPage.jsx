@@ -1,6 +1,32 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
+  const { isAuthenticated, isLoading, login } = useAuth();
+  const [email, setEmail] = useState('admin@hkids.app');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isLoading && isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      await login({ email, password });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to sign in.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl shadow-slate-950/40 lg:grid-cols-[1.1fr_0.9fr]">
@@ -10,32 +36,33 @@ export default function LoginPage() {
               H-Kids Platform
             </p>
             <h1 className="mt-6 max-w-md text-4xl font-semibold leading-tight text-white">
-              Administrative AI Assistant foundation for scalable operations.
+              Secure access to your multi-agent AI workspace.
             </h1>
           </div>
           <p className="max-w-md text-sm leading-6 text-cyan-50/90">
-            Clean architecture first: secure entry point, modular frontend, and backend ready for
-            future AI and PostgreSQL integration.
+            Sign in with your H-Kids account to manage agents, documents, workflows, and human
+            validation processes.
           </p>
         </section>
 
         <section className="p-8 sm:p-10">
           <div className="mx-auto max-w-md">
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-300">
-              Sign In
-            </p>
+            <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-300">Sign In</p>
             <h2 className="mt-4 text-3xl font-semibold text-white">Welcome back</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              This screen is intentionally UI-only. Authentication logic is not implemented in this
-              foundation phase.
+              Use your administrator credentials to access the platform.
             </p>
 
-            <form className="mt-10 space-y-5">
+            <form className="mt-10 space-y-5" onSubmit={handleSubmit}>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-200">Email</span>
                 <input
                   type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="admin@hkids.app"
+                  autoComplete="email"
+                  required
                   className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-400"
                 />
               </label>
@@ -44,17 +71,28 @@ export default function LoginPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-200">Password</span>
                 <input
                   type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
                   className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-400"
                 />
               </label>
 
-              <Link
-                to="/dashboard"
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              {error ? (
+                <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting || isLoading}
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Enter platform
-              </Link>
+                {isSubmitting ? 'Signing in...' : 'Enter platform'}
+              </button>
             </form>
           </div>
         </section>

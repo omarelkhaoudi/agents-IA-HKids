@@ -1,9 +1,5 @@
 import { defaultContext, supportedModels } from '../data/assistant-config.js';
-import { createDatabasePool } from '../config/database.js';
 import { env } from '../config/env.js';
-import { listDocumentSources } from '../data/mock-document-sources.js';
-import { listDocuments } from '../data/mock-documents.js';
-import { listPrompts } from '../data/mock-prompts.js';
 import { ProviderFactory } from '../providers/ProviderFactory.js';
 import { ConversationService } from '../services/ConversationService.js';
 import { AIGateway } from '../services/ai-gateway/AIGateway.js';
@@ -33,13 +29,11 @@ import { HybridRetriever } from '../services/retrieval/HybridRetriever.js';
 import { KeywordRetriever } from '../services/retrieval/KeywordRetriever.js';
 import { RetrievalService } from '../services/retrieval/RetrievalService.js';
 import { SemanticRetriever } from '../services/retrieval/SemanticRetriever.js';
+import { databasePool } from './database-runtime.js';
+import { listDocumentSources, listDocuments, listPrompts } from './content-runtime.js';
 
-const databasePool = createDatabasePool({
-  connectionString: env.databaseUrl,
-  sslEnabled: env.dbSsl,
-  allowInMemory: env.nodeEnv === 'development' && !env.databaseUrl,
-});
-export const persistenceService = new PersistenceService(databasePool, {
+const databasePoolRef = databasePool;
+export const persistenceService = new PersistenceService(databasePoolRef, {
   listDocuments,
   listPrompts,
 });

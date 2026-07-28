@@ -1,6 +1,12 @@
 import { Router } from 'express';
+import { validate } from '../middleware/validate.js';
 import { agentManagementService } from '../runtime/admin-runtime.js';
 import { conversationService, getAssistantBootstrap } from '../runtime/assistant-runtime.js';
+import {
+  conversationIdParamsSchema,
+  createConversationBodySchema,
+  sendMessageBodySchema,
+} from '../validation/schemas.js';
 
 const assistantRouter = Router();
 
@@ -27,7 +33,7 @@ assistantRouter.get('/conversations', (_request, response) => {
     });
 });
 
-assistantRouter.post('/conversations', (request, response) => {
+assistantRouter.post('/conversations', validate({ body: createConversationBodySchema }), (request, response) => {
   Promise.resolve(conversationService.createSession(request.body))
     .then((session) => {
       response.status(201).json(session);
@@ -39,7 +45,7 @@ assistantRouter.post('/conversations', (request, response) => {
     });
 });
 
-assistantRouter.get('/conversations/:id', (request, response) => {
+assistantRouter.get('/conversations/:id', validate({ params: conversationIdParamsSchema }), (request, response) => {
   Promise.resolve(conversationService.getSession(request.params.id))
     .then((session) => {
       if (!session) {
@@ -56,7 +62,10 @@ assistantRouter.get('/conversations/:id', (request, response) => {
     });
 });
 
-assistantRouter.post('/conversations/:id/messages', async (request, response) => {
+assistantRouter.post(
+  '/conversations/:id/messages',
+  validate({ params: conversationIdParamsSchema, body: sendMessageBodySchema }),
+  async (request, response) => {
   try {
     const result = await conversationService.sendMessage({
       sessionId: request.params.id,

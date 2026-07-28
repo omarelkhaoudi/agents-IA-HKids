@@ -1,10 +1,17 @@
 import { Router } from 'express';
+import { validate } from '../middleware/validate.js';
 import {
   agentConfigurationService,
   agentManagementService,
   dashboardService,
   systemSettingsService,
 } from '../runtime/admin-runtime.js';
+import {
+  createAgentBodySchema,
+  idParamsSchema,
+  updateAgentBodySchema,
+  updateSettingsBodySchema,
+} from '../validation/schemas.js';
 
 const adminRouter = Router();
 
@@ -24,7 +31,7 @@ adminRouter.get('/admin/agents', async (_request, response) => {
   response.json({ items: agents, resources });
 });
 
-adminRouter.post('/admin/agents', async (request, response) => {
+adminRouter.post('/admin/agents', validate({ body: createAgentBodySchema }), async (request, response) => {
   try {
     const agent = await agentManagementService.createAgent(request.body || {});
     response.status(201).json(agent);
@@ -35,7 +42,7 @@ adminRouter.post('/admin/agents', async (request, response) => {
   }
 });
 
-adminRouter.put('/admin/agents/:id', async (request, response) => {
+adminRouter.put('/admin/agents/:id', validate({ params: idParamsSchema, body: updateAgentBodySchema }), async (request, response) => {
   try {
     const agent = await agentManagementService.updateAgent(request.params.id, request.body || {});
     response.json(agent);
@@ -46,7 +53,7 @@ adminRouter.put('/admin/agents/:id', async (request, response) => {
   }
 });
 
-adminRouter.delete('/admin/agents/:id', async (request, response) => {
+adminRouter.delete('/admin/agents/:id', validate({ params: idParamsSchema }), async (request, response) => {
   try {
     const result = await agentManagementService.deleteAgent(request.params.id);
     response.json(result);
@@ -62,7 +69,7 @@ adminRouter.get('/admin/settings', async (_request, response) => {
   response.json({ settings });
 });
 
-adminRouter.put('/admin/settings', async (request, response) => {
+adminRouter.put('/admin/settings', validate({ body: updateSettingsBodySchema }), async (request, response) => {
   try {
     const settings = await systemSettingsService.updateSettings(request.body?.settings || request.body || {});
     response.json({ settings });

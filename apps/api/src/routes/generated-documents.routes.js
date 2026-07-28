@@ -1,8 +1,17 @@
 import { Router } from 'express';
+import { validate } from '../middleware/validate.js';
 import { persistenceService } from '../runtime/assistant-runtime.js';
 import { documentExporters, documentGenerationService } from '../runtime/document-runtime.js';
 import { workflowEngine } from '../runtime/workflow-runtime.js';
 import { workflowStates } from '../services/workflows/WorkflowRules.js';
+import {
+  approveGeneratedDocumentBodySchema,
+  conversationDocumentParamsSchema,
+  conversationIdParamsSchema,
+  createGeneratedDocumentBodySchema,
+  exportDocumentQuerySchema,
+  updateGeneratedDocumentBodySchema,
+} from '../validation/schemas.js';
 
 const generatedDocumentsRouter = Router();
 
@@ -19,7 +28,10 @@ function serializeDocument(document) {
   };
 }
 
-generatedDocumentsRouter.post('/conversations/:id/generated-documents', async (request, response) => {
+generatedDocumentsRouter.post(
+  '/conversations/:id/generated-documents',
+  validate({ params: conversationIdParamsSchema, body: createGeneratedDocumentBodySchema }),
+  async (request, response) => {
   const session = await persistenceService.sessionRepository.getSessionById(request.params.id);
 
   if (!session) {
@@ -69,9 +81,13 @@ generatedDocumentsRouter.post('/conversations/:id/generated-documents', async (r
     reviewers: ['Administrator'],
   });
   response.status(201).json(serializeDocument(createdDocument));
-});
+  }
+);
 
-generatedDocumentsRouter.put('/conversations/:id/generated-documents/:documentId', async (request, response) => {
+generatedDocumentsRouter.put(
+  '/conversations/:id/generated-documents/:documentId',
+  validate({ params: conversationDocumentParamsSchema, body: updateGeneratedDocumentBodySchema }),
+  async (request, response) => {
   const session = await persistenceService.sessionRepository.getSessionById(request.params.id);
 
   if (!session) {
@@ -128,10 +144,12 @@ generatedDocumentsRouter.put('/conversations/:id/generated-documents/:documentId
   );
 
   response.json(serializeDocument(updatedDocument));
-});
+  }
+);
 
 generatedDocumentsRouter.post(
   '/conversations/:id/generated-documents/:documentId/approve',
+  validate({ params: conversationDocumentParamsSchema, body: approveGeneratedDocumentBodySchema }),
   async (request, response) => {
     const existingDocument = await persistenceService.generatedDocumentRepository.getById(
       request.params.documentId
@@ -185,6 +203,7 @@ generatedDocumentsRouter.post(
 
 generatedDocumentsRouter.get(
   '/conversations/:id/generated-documents/:documentId/export',
+  validate({ params: conversationDocumentParamsSchema, query: exportDocumentQuerySchema }),
   async (request, response) => {
     const existingDocument = await persistenceService.generatedDocumentRepository.getById(
       request.params.documentId
