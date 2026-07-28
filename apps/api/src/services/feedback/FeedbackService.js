@@ -49,6 +49,7 @@ export class FeedbackService {
         patternText: pattern.patternText,
         metadata: {
           feedbackType: payload.feedbackType,
+          agentCode: payload.agentCode || 'administrative-assistant',
         },
       });
 
@@ -71,8 +72,8 @@ export class FeedbackService {
     };
   }
 
-  async getApprovedGuidance() {
-    const approvedPatterns = await this.feedbackRepository.listApprovedPatterns();
+  async getApprovedGuidance(agentCode) {
+    const approvedPatterns = await this.feedbackRepository.listApprovedPatterns(agentCode);
 
     if (approvedPatterns.length === 0) {
       return '';
@@ -81,8 +82,8 @@ export class FeedbackService {
     return approvedPatterns.map((pattern) => `- ${pattern.pattern_text}`).join('\n');
   }
 
-  async getDashboard() {
-    const stats = await this.feedbackRepository.getDashboardStats();
+  async getDashboard(agentCode) {
+    const stats = await this.feedbackRepository.getDashboardStats(agentCode);
     return this.suggestionEngine.buildDashboard(stats);
   }
 

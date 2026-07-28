@@ -44,13 +44,18 @@ export async function initializeAdminRuntime() {
     currency: 'MAD',
   });
 
-  const agents = await agentManagementService.listAgents();
+  const existingAgents = await agentManagementService.listAgents();
+  const existingByCode = new Set(existingAgents.map((agent) => agent.code));
 
-  if (!agents.length) {
+  for (const blueprint of agentConfigurationService.listAgentBlueprints()) {
+    if (existingByCode.has(blueprint.code)) {
+      continue;
+    }
+
     await agentManagementService.createAgent({
-      code: 'administrative-assistant',
-      name: 'Administrative Assistant',
-      description: 'Operational administrative drafting and document generation agent.',
+      code: blueprint.code,
+      name: blueprint.name,
+      description: blueprint.description,
       status: 'active',
       defaultProvider: env.defaultProvider,
       defaultModel: env.defaultModel,
@@ -59,8 +64,8 @@ export async function initializeAdminRuntime() {
       timeout: env.requestTimeoutMs,
       retryCount: env.maxRetries,
       promptIds: ['prompt-001'],
-      documentIds: ['doc-001'],
-      workflowCodes: ['document-review'],
+      documentIds: ['doc-001', 'doc-002'],
+      workflowCodes: blueprint.workflowCodes,
     });
   }
 }

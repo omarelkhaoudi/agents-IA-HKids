@@ -6,27 +6,21 @@ export class AdminStatsRepository {
   }
 
   async getPlatformCounts() {
-    const [
-      conversations,
-      generatedDocuments,
-      approvedDocuments,
-      activeWorkflows,
-      feedback,
-      agents,
-    ] = await Promise.all([
-      this.pool.query('SELECT COUNT(*)::int AS total FROM conversations'),
-      this.pool.query('SELECT COUNT(*)::int AS total FROM generated_documents'),
-      this.pool.query('SELECT COUNT(*)::int AS total FROM generated_documents WHERE approved = true'),
-      this.pool.query(
-        `
-          SELECT COUNT(*)::int AS total
-          FROM workflow_instances
-          WHERE current_state NOT IN ('Archived', 'Rejected')
-        `
-      ),
-      this.pool.query('SELECT COUNT(*)::int AS total FROM feedback'),
-      this.pool.query('SELECT COUNT(*)::int AS total FROM agents'),
-    ]);
+    const [conversations, generatedDocuments, approvedDocuments, activeWorkflows, feedback, agents] =
+      await Promise.all([
+        this.pool.query('SELECT COUNT(*)::int AS total FROM conversations'),
+        this.pool.query('SELECT COUNT(*)::int AS total FROM generated_documents'),
+        this.pool.query('SELECT COUNT(*)::int AS total FROM generated_documents WHERE approved = true'),
+        this.pool.query(
+          `
+            SELECT COUNT(*)::int AS total
+            FROM workflow_instances
+            WHERE current_state NOT IN ('Archived', 'Rejected')
+          `
+        ),
+        this.pool.query('SELECT COUNT(*)::int AS total FROM feedback'),
+        this.pool.query('SELECT COUNT(*)::int AS total FROM agents'),
+      ]);
 
     return {
       totalAgents: agents.rows[0]?.total || 0,
@@ -65,11 +59,12 @@ export class AdminStatsRepository {
       SELECT
         model,
         provider,
+        agent_code,
         COUNT(*)::int AS requests,
         COALESCE(SUM(total_tokens), 0)::int AS total_tokens,
         COALESCE(SUM(estimated_cost), 0)::float AS estimated_cost
       FROM ai_usage
-      GROUP BY model, provider
+      GROUP BY model, provider, agent_code
       ORDER BY requests DESC
     `);
 
@@ -81,7 +76,7 @@ export class AdminStatsRepository {
         COALESCE(SUM(u.total_tokens), 0)::int AS total_tokens,
         COUNT(u.id)::int AS requests
       FROM agents a
-      LEFT JOIN ai_usage u ON u.model = a.default_model
+      LEFT JOIN ai_usage u ON u.agent_code = a.code
       GROUP BY a.code, a.name
       ORDER BY estimated_cost DESC
     `);

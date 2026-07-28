@@ -8,6 +8,7 @@ function formatMessageTimestamp(timestamp) {
 function mapGeneratedDocument(document) {
   return {
     id: document.id,
+    agentCode: document.agent_code,
     approved: document.approved,
     version: document.version,
     status: document.status,
@@ -45,6 +46,7 @@ export class SessionRepository {
       provider: payload.provider,
       model: payload.model,
       language: payload.language || payload.currentContext?.language || 'English',
+      agentCode: payload.agentCode || 'administrative-assistant',
       currentContext: payload.currentContext,
       metadata: payload.metadata || {},
     });
@@ -63,6 +65,7 @@ export class SessionRepository {
       provider: payload.provider,
       model: payload.model,
       language: payload.language || payload.currentContext?.language || 'English',
+      agentCode: payload.agentCode || 'administrative-assistant',
       currentContext: payload.currentContext,
       metadata: payload.metadata || {},
     });
@@ -95,6 +98,7 @@ export class SessionRepository {
       title: conversation.title,
       createdAt: conversation.created_at.toISOString(),
       updatedAt: conversation.updated_at.toISOString(),
+      agentCode: conversation.agent_code,
       selectedPromptId,
       selectedDocumentIds,
       currentContext: conversation.current_context,
@@ -110,8 +114,8 @@ export class SessionRepository {
     };
   }
 
-  async listSessions({ limit = 20, offset = 0, search = '' } = {}) {
-    const conversations = await this.conversationRepository.list({ limit, offset, search });
+  async listSessions({ limit = 20, offset = 0, search = '', agentCode } = {}) {
+    const conversations = await this.conversationRepository.list({ limit, offset, search, agentCode });
     return Promise.all(conversations.map((conversation) => this.getSessionById(conversation.id)));
   }
 }

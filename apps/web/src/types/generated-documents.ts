@@ -1,5 +1,6 @@
 export interface GeneratedDocumentRecord {
   id: string;
+  agentCode?: string;
   approved: boolean;
   version?: number;
   status?: string;

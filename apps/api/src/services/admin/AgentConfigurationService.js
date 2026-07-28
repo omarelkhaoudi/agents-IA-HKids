@@ -1,6 +1,6 @@
 /**
  * Prepares agent association configuration for prompts, documents, and workflows.
- * Does not invent new business agents â€” only stores configurable links.
+ * Does not invent new business agents — only stores configurable links.
  */
 export class AgentConfigurationService {
   constructor({ agentRepository, listDocuments, listPrompts }) {
@@ -41,6 +41,35 @@ export class AgentConfigurationService {
         { id: 'llama3', provider: 'ollama' },
       ],
     };
+  }
+
+  listAgentBlueprints() {
+    return [
+      {
+        code: 'community-manager',
+        name: 'Community Manager IA',
+        description: 'Prepares publications, stories, editorial calendars, and community replies.',
+        workflowCodes: ['document-review'],
+      },
+      {
+        code: 'administrative-assistant',
+        name: 'Assistant administratif IA',
+        description: 'Prepares quotations, invoices, delivery notes, letters, and operational documents.',
+        workflowCodes: ['document-review', 'export-approval'],
+      },
+      {
+        code: 'sales-agent',
+        name: 'Agent commercial IA',
+        description: 'Prepares qualification notes, proposals, follow-ups, and commercial drafts.',
+        workflowCodes: ['document-review'],
+      },
+      {
+        code: 'hr-agent',
+        name: 'Agent RH IA',
+        description: 'Prepares HR letters, role descriptions, follow-up sheets, and staff documents.',
+        workflowCodes: ['document-review', 'archive-flow'],
+      },
+    ];
   }
 
   async updateConfiguration(agentId, configuration) {

@@ -7,16 +7,17 @@ export class FeedbackRepository {
     await this.pool.query(
       `
         INSERT INTO feedback (
-          id, conversation_id, message_id, document_id, original_text, corrected_text,
+          id, conversation_id, message_id, document_id, agent_code, original_text, corrected_text,
           feedback_type, rating, comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `,
       [
         payload.id,
         payload.conversationId,
         payload.messageId || null,
         payload.documentId || null,
+        payload.agentCode || 'administrative-assistant',
         payload.originalText,
         payload.correctedText || null,
         payload.feedbackType,
@@ -136,21 +137,39 @@ export class FeedbackRepository {
     return result.rows[0] || null;
   }
 
-  async listApprovedPatterns() {
+  async listApprovedPatterns(agentCode) {
+    const values = [];
+    let whereClause = "WHERE status = 'approved'";
+
+    if (agentCode) {
+      values.push(agentCode);
+      whereClause += ` AND (metadata->>'agentCode' = $${values.length} OR metadata->>'agentCode' IS NULL)`;
+    }
+
     const result = await this.pool.query(
       `
         SELECT * FROM feedback_patterns
-        WHERE status = 'approved'
+        ${whereClause}
         ORDER BY occurrences DESC, created_at DESC
-      `
+      `,
+      values
     );
 
     return result.rows;
   }
 
-  async getDashboardStats() {
+  async getDashboardStats(agentCode) {
+    const values = [];
+    const feedbackWhere = [];
+
+    if (agentCode) {
+      values.push(agentCode);
+      feedbackWhere.push(`agent_code = $${values.length}`);
+    }
+
+    const feedbackQuery = `SELECT * FROM feedback ${feedbackWhere.length ? `WHERE ${feedbackWhere.join(' AND ')}` : ''} ORDER BY created_at DESC`;
     const [feedbackResult, patternsResult, improvementsResult] = await Promise.all([
-      this.pool.query('SELECT * FROM feedback ORDER BY created_at DESC'),
+      this.pool.query(feedbackQuery, values),
       this.pool.query('SELECT * FROM feedback_patterns ORDER BY occurrences DESC, created_at DESC'),
       this.pool.query('SELECT * FROM prompt_improvements ORDER BY created_at DESC'),
     ]);

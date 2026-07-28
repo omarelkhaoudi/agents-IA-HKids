@@ -4,24 +4,23 @@ import ModuleCard from '../components/ModuleCard';
 const modules = [
   {
     title: 'Administrative Assistant',
-    description:
-      'The first active H-Kids module, prepared as the operational entry point for future administrative workflows.',
+    description: 'Active prototype for quotations, invoices, administrative letters, and document workflows.',
     enabled: true,
   },
   {
     title: 'Community Manager',
-    description: 'Reserved for future social engagement, moderation, and content assistance features.',
-    enabled: false,
+    description: 'Active prototype for editorial calendars, publication drafts, story ideas, and comment responses.',
+    enabled: true,
   },
   {
     title: 'Sales Agent',
-    description: 'Reserved for future lead qualification, follow-up orchestration, and CRM support.',
-    enabled: false,
+    description: 'Active prototype for lead qualification, proposals, product suggestions, and follow-up drafts.',
+    enabled: true,
   },
   {
     title: 'HR Agent',
-    description: 'Reserved for future recruitment support, staff administration, and internal workflows.',
-    enabled: false,
+    description: 'Active prototype for HR letters, job descriptions, absence follow-up, and staff documents.',
+    enabled: true,
   },
 ];
 
@@ -32,11 +31,12 @@ export default function DashboardPage() {
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-300">Dashboard</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-            AI modules for H-Kids
+            H-Kids AI agent platform
           </h1>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-400">
-            This foundation emphasizes maintainable architecture and progressive delivery. Only the
-            Administrative Assistant is active in this first release.
+            The platform now supports a governed multi-agent prototype with Community, Administrative,
+            Sales, and HR workspaces sharing the same AI, retrieval, workflow, feedback, and
+            administration foundations.
           </p>
         </div>
 
@@ -44,7 +44,7 @@ export default function DashboardPage() {
           to="/assistant"
           className="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
         >
-          Open Administrative Assistant
+          Open Agent Workspace
         </Link>
       </div>
 

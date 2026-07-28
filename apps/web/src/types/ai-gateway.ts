@@ -18,6 +18,7 @@ export interface AiUsageRecord {
   model: string;
   conversation_id: string | null;
   user_id: string | null;
+  agent_code?: string;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -36,6 +37,7 @@ export interface AiStatistics {
   byModel: Array<{
     model: string;
     provider: string;
+    agent_code?: string;
     requests: number;
     total_tokens: number;
     estimated_cost: number;

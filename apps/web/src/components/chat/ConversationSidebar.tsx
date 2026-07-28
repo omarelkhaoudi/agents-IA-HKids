@@ -27,7 +27,7 @@ export default function ConversationSidebar({
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">
             Conversation Sessions
           </p>
-          <p className="mt-1 text-sm text-slate-500">Stored in active runtime memory</p>
+          <p className="mt-1 text-sm text-slate-500">Stored per selected agent workspace</p>
         </div>
         <Badge tone="info">{sessions.length}</Badge>
       </div>
@@ -50,7 +50,7 @@ export default function ConversationSidebar({
             >
               <p className="text-sm font-semibold text-white">{session.title}</p>
               <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">
-                {session.provider} | {session.model}
+                {session.agentCode} | {session.provider} | {session.model}
               </p>
               <p className="mt-3 text-xs text-slate-500">
                 {session.messages.length} messages | Updated{' '}

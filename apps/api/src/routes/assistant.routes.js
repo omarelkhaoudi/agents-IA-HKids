@@ -1,14 +1,22 @@
 import { Router } from 'express';
+import { agentManagementService } from '../runtime/admin-runtime.js';
 import { conversationService, getAssistantBootstrap } from '../runtime/assistant-runtime.js';
 
 const assistantRouter = Router();
 
-assistantRouter.get('/assistant/bootstrap', (_request, response) => {
-  response.json(getAssistantBootstrap());
+assistantRouter.get('/assistant/bootstrap', async (_request, response) => {
+  const agents = await agentManagementService.listAgents();
+  const activeAgents = agents.filter((agent) => agent.status === 'active');
+
+  response.json({
+    ...getAssistantBootstrap(),
+    agents: activeAgents,
+    defaultAgentCode: activeAgents[0]?.code || 'administrative-assistant',
+  });
 });
 
 assistantRouter.get('/conversations', (_request, response) => {
-  Promise.resolve(conversationService.listSessions())
+  Promise.resolve(conversationService.listSessions({ agentCode: _request.query.agentCode }))
     .then((items) => {
       response.json({ items });
     })
@@ -54,6 +62,7 @@ assistantRouter.post('/conversations/:id/messages', async (request, response) =>
       sessionId: request.params.id,
       provider: request.body.provider,
       model: request.body.model,
+      agentCode: request.body.agentCode,
       selectedPromptId: request.body.selectedPromptId,
       selectedDocumentIds: request.body.selectedDocumentIds || [],
       currentContext: request.body.currentContext,

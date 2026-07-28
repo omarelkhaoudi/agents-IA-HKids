@@ -6,6 +6,19 @@ import { workflowStates } from '../services/workflows/WorkflowRules.js';
 
 const generatedDocumentsRouter = Router();
 
+function serializeDocument(document) {
+  return {
+    id: document.id,
+    agentCode: document.agent_code,
+    approved: document.approved,
+    structuredDocument: document.structured_document,
+    resolvedVariables: document.resolved_variables,
+    renderedPreview: document.rendered_preview,
+    validationWarnings: document.validation_warnings,
+    availableExportFormats: document.available_export_formats,
+  };
+}
+
 generatedDocumentsRouter.post('/conversations/:id/generated-documents', async (request, response) => {
   const session = await persistenceService.sessionRepository.getSessionById(request.params.id);
 
@@ -30,6 +43,7 @@ generatedDocumentsRouter.post('/conversations/:id/generated-documents', async (r
 
   const record = {
     id: generatedDocument.structuredDocument.id,
+    agentCode: session.agentCode,
     approved: false,
     conversationId: request.params.id,
     documentType: request.body.documentType,
@@ -54,15 +68,7 @@ generatedDocumentsRouter.post('/conversations/:id/generated-documents', async (r
     documentId: createdDocument.id,
     reviewers: ['Administrator'],
   });
-  response.status(201).json({
-    id: createdDocument.id,
-    approved: createdDocument.approved,
-    structuredDocument: createdDocument.structured_document,
-    resolvedVariables: createdDocument.resolved_variables,
-    renderedPreview: createdDocument.rendered_preview,
-    validationWarnings: createdDocument.validation_warnings,
-    availableExportFormats: createdDocument.available_export_formats,
-  });
+  response.status(201).json(serializeDocument(createdDocument));
 });
 
 generatedDocumentsRouter.put('/conversations/:id/generated-documents/:documentId', async (request, response) => {
@@ -98,6 +104,7 @@ generatedDocumentsRouter.put('/conversations/:id/generated-documents/:documentId
     request.params.documentId,
     {
       conversationId: request.params.id,
+      agentCode: session.agentCode,
       structuredDocument: {
         ...regenerated.structuredDocument,
         id: existingDocument.structured_document.id,
@@ -120,15 +127,7 @@ generatedDocumentsRouter.put('/conversations/:id/generated-documents/:documentId
     }
   );
 
-  response.json({
-    id: updatedDocument.id,
-    approved: updatedDocument.approved,
-    structuredDocument: updatedDocument.structured_document,
-    resolvedVariables: updatedDocument.resolved_variables,
-    renderedPreview: updatedDocument.rendered_preview,
-    validationWarnings: updatedDocument.validation_warnings,
-    availableExportFormats: updatedDocument.available_export_formats,
-  });
+  response.json(serializeDocument(updatedDocument));
 });
 
 generatedDocumentsRouter.post(
@@ -164,6 +163,7 @@ generatedDocumentsRouter.post(
     const updatedDocument = await persistenceService.generatedDocumentRepository.update(
       request.params.documentId,
       {
+        agentCode: existingDocument.agent_code,
         structuredDocument: existingDocument.structured_document,
         resolvedVariables: existingDocument.resolved_variables,
         renderedPreview: existingDocument.rendered_preview,
@@ -179,15 +179,7 @@ generatedDocumentsRouter.post(
       }
     );
 
-    response.json({
-      id: updatedDocument.id,
-      approved: updatedDocument.approved,
-      structuredDocument: updatedDocument.structured_document,
-      resolvedVariables: updatedDocument.resolved_variables,
-      renderedPreview: updatedDocument.rendered_preview,
-      validationWarnings: updatedDocument.validation_warnings,
-      availableExportFormats: updatedDocument.available_export_formats,
-    });
+    response.json(serializeDocument(updatedDocument));
   }
 );
 

@@ -50,6 +50,7 @@ export class AIGateway {
     messages,
     conversationId,
     userId,
+    agentCode,
     stream = false,
     onChunk,
   }) {
@@ -116,6 +117,7 @@ export class AIGateway {
         model: resolvedModel,
         conversationId,
         userId,
+        agentCode: agentCode || 'administrative-assistant',
         promptTokens,
         completionTokens,
         totalTokens,
@@ -140,6 +142,7 @@ export class AIGateway {
         model: resolvedModel,
         conversationId,
         userId,
+        agentCode: agentCode || 'administrative-assistant',
         promptTokens,
         completionTokens: 0,
         totalTokens: promptTokens,

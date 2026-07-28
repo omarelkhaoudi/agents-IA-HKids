@@ -1,6 +1,7 @@
 import type { KnowledgeBaseDocument } from './knowledge-base';
 import type { PromptDefinition } from './prompts';
 import type { GeneratedDocumentRecord } from './generated-documents';
+import type { AdminAgent } from './admin';
 
 export interface AssistantContext {
   department: string;
@@ -21,6 +22,7 @@ export interface AssistantSession {
   title: string;
   createdAt: string;
   updatedAt: string;
+  agentCode: string;
   selectedPromptId: string;
   selectedDocumentIds: string[];
   currentContext: AssistantContext;
@@ -39,7 +41,9 @@ export interface AssistantBootstrapResponse {
   prompts: PromptDefinition[];
   documents: KnowledgeBaseDocument[];
   models: AssistantModelOption[];
+  agents: AdminAgent[];
   defaultModel: string;
   defaultProvider: string;
+  defaultAgentCode: string;
   defaultContext: AssistantContext;
 }

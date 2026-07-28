@@ -7,9 +7,9 @@ export class ConversationRepository {
     const result = await this.pool.query(
       `
         INSERT INTO conversations (
-          id, title, provider, model, language, current_context, metadata
+          id, title, provider, model, language, agent_code, current_context, metadata
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)
         RETURNING *
       `,
       [
@@ -18,6 +18,7 @@ export class ConversationRepository {
         payload.provider,
         payload.model,
         payload.language,
+        payload.agentCode || 'administrative-assistant',
         JSON.stringify(payload.currentContext || {}),
         JSON.stringify(payload.metadata || {}),
       ]
@@ -33,8 +34,9 @@ export class ConversationRepository {
         SET provider = $2,
             model = $3,
             language = $4,
-            current_context = $5::jsonb,
-            metadata = $6::jsonb,
+            agent_code = $5,
+            current_context = $6::jsonb,
+            metadata = $7::jsonb,
             updated_at = NOW()
         WHERE id = $1
         RETURNING *
@@ -44,6 +46,7 @@ export class ConversationRepository {
         payload.provider,
         payload.model,
         payload.language,
+        payload.agentCode || 'administrative-assistant',
         JSON.stringify(payload.currentContext || {}),
         JSON.stringify(payload.metadata || {}),
       ]
@@ -57,23 +60,36 @@ export class ConversationRepository {
     return result.rows[0] || null;
   }
 
-  async list({ limit = 20, offset = 0, search = '' } = {}) {
-    const hasSearch = Boolean(search.trim());
-    const query = hasSearch
-      ? `
-          SELECT * FROM conversations
-          WHERE title ILIKE $1
-          ORDER BY updated_at DESC
-          LIMIT $2 OFFSET $3
-        `
-      : `
-          SELECT * FROM conversations
-          ORDER BY updated_at DESC
-          LIMIT $1 OFFSET $2
-        `;
+  async list({ limit = 20, offset = 0, search = '', agentCode } = {}) {
+    const clauses = [];
+    const values = [];
 
-    const values = hasSearch ? [`%${search}%`, limit, offset] : [limit, offset];
-    const result = await this.pool.query(query, values);
+    if (search.trim()) {
+      values.push(`%${search}%`);
+      clauses.push(`title ILIKE $${values.length}`);
+    }
+
+    if (agentCode) {
+      values.push(agentCode);
+      clauses.push(`agent_code = $${values.length}`);
+    }
+
+    values.push(limit);
+    const limitRef = `$${values.length}`;
+    values.push(offset);
+    const offsetRef = `$${values.length}`;
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await this.pool.query(
+      `
+        SELECT * FROM conversations
+        ${whereClause}
+        ORDER BY updated_at DESC
+        LIMIT ${limitRef} OFFSET ${offsetRef}
+      `,
+      values
+    );
+
     return result.rows;
   }
 }

@@ -22,12 +22,13 @@ export class ConversationService {
   async createSession(payload) {
     return this.sessionRepository.createSession({
       ...payload,
+      agentCode: payload.agentCode || 'administrative-assistant',
       id: `session-${Date.now()}`,
     });
   }
 
-  async listSessions() {
-    return this.sessionRepository.listSessions();
+  async listSessions(filters) {
+    return this.sessionRepository.listSessions(filters);
   }
 
   async getSession(sessionId) {
@@ -38,6 +39,7 @@ export class ConversationService {
     sessionId,
     provider,
     model,
+    agentCode,
     selectedPromptId,
     selectedDocumentIds,
     currentContext,
@@ -50,10 +52,10 @@ export class ConversationService {
     }
 
     const selectedDocuments = this.knowledgeRepository.getDocumentsByIds(selectedDocumentIds);
-
+    const resolvedAgentCode = agentCode || 'administrative-assistant';
     const retrievedContext = this.retrievalService.retrieveRelevantContext(userMessage);
     const approvedGuidance = this.feedbackService
-      ? await this.feedbackService.getApprovedGuidance()
+      ? await this.feedbackService.getApprovedGuidance(resolvedAgentCode)
       : '';
     const enrichedRetrievedContext = approvedGuidance
       ? {
@@ -78,6 +80,7 @@ export class ConversationService {
     const updatedSession = await this.sessionRepository.updateSessionConfig(sessionId, {
       provider,
       model,
+      agentCode: resolvedAgentCode,
       selectedPromptId,
       selectedDocumentIds,
       currentContext,
@@ -104,6 +107,7 @@ export class ConversationService {
       systemPrompt: assembledPrompt,
       messages: [...historyMessages, { role: 'user', content: userMessage }],
       conversationId: sessionId,
+      agentCode: resolvedAgentCode,
     });
 
     const assistantEntry = this.createMessage('assistant', providerResponse.text);
@@ -120,6 +124,7 @@ export class ConversationService {
       requestPreview: {
         provider,
         model,
+        agentCode: resolvedAgentCode,
         assembledPrompt,
         retrieval: enrichedRetrievedContext,
         usage: providerResponse.usage || null,

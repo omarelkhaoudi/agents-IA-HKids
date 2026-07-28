@@ -12,10 +12,10 @@ export class UsageLogger {
     await this.pool.query(
       `
         INSERT INTO ai_usage (
-          id, provider, model, conversation_id, user_id, prompt_tokens, completion_tokens,
+          id, provider, model, conversation_id, user_id, agent_code, prompt_tokens, completion_tokens,
           total_tokens, estimated_cost, duration_ms, status, error_message
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       `,
       [
         entry.id,
@@ -23,6 +23,7 @@ export class UsageLogger {
         entry.model,
         entry.conversationId || null,
         entry.userId || null,
+        entry.agentCode || 'administrative-assistant',
         entry.promptTokens || 0,
         entry.completionTokens || 0,
         entry.totalTokens || 0,
@@ -36,7 +37,7 @@ export class UsageLogger {
     return entry;
   }
 
-  async listUsage({ provider, model, date } = {}) {
+  async listUsage({ provider, model, date, agentCode } = {}) {
     if (!this.pool) {
       return [];
     }
@@ -57,6 +58,11 @@ export class UsageLogger {
     if (date) {
       values.push(date);
       filters.push(`DATE(created_at) = $${values.length}::date`);
+    }
+
+    if (agentCode) {
+      values.push(agentCode);
+      filters.push(`agent_code = $${values.length}`);
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -98,11 +104,12 @@ export class UsageLogger {
       SELECT
         model,
         provider,
+        agent_code,
         COUNT(*)::int AS requests,
         COALESCE(SUM(total_tokens), 0)::int AS total_tokens,
         COALESCE(SUM(estimated_cost), 0)::float AS estimated_cost
       FROM ai_usage
-      GROUP BY model, provider
+      GROUP BY model, provider, agent_code
       ORDER BY requests DESC
     `);
 

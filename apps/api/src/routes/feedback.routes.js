@@ -3,8 +3,8 @@ import { feedbackService } from '../runtime/assistant-runtime.js';
 
 const feedbackRouter = Router();
 
-feedbackRouter.get('/feedback/dashboard', async (_request, response) => {
-  const dashboard = await feedbackService.getDashboard();
+feedbackRouter.get('/feedback/dashboard', async (request, response) => {
+  const dashboard = await feedbackService.getDashboard(request.query.agentCode);
   response.json(dashboard);
 });
 
@@ -13,6 +13,7 @@ feedbackRouter.post('/feedback', async (request, response) => {
     conversationId: request.body.conversationId,
     messageId: request.body.messageId,
     documentId: request.body.documentId,
+    agentCode: request.body.agentCode,
     originalText: request.body.originalText,
     correctedText: request.body.correctedText,
     feedbackType: request.body.feedbackType,

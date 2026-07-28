@@ -22,6 +22,7 @@ aiRouter.get('/ai/usage', async (request, response) => {
     provider: request.query.provider,
     model: request.query.model,
     date: request.query.date,
+    agentCode: request.query.agentCode,
   });
 
   response.json({ items });

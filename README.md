@@ -1,113 +1,139 @@
-# H-Kids Administrative AI Assistant
+# H-Kids AI Agent Platform
 
-Production-ready monorepo foundation for the first H-Kids AI platform module: an Administrative AI Assistant.
+Multi-agent prototype for H-Kids with 4 specialized agents sharing one governed technical foundation:
 
-## Stack
+- `community-manager`
+- `administrative-assistant`
+- `sales-agent`
+- `hr-agent`
 
-- Monorepo: npm workspaces
-- Frontend: React + Vite + Tailwind CSS
-- Backend: Node.js + Express
-- Database readiness: PostgreSQL configuration scaffold with `pg`
-- Tooling: ESLint + Prettier
+The platform is designed so that every sensitive action remains human-approved. Agents prepare drafts, recommendations, and documents, but they do not publish, send, discount, or validate anything automatically.
 
-## Project Structure
+## Current Scope
 
-```text
-.
-├── apps
-│   ├── api
-│   │   ├── src
-│   │   │   ├── config
-│   │   │   ├── routes
-│   │   │   ├── app.js
-│   │   │   ├── index.js
-│   │   │   └── server.js
-│   │   ├── .env.example
-│   │   └── package.json
-│   └── web
-│       ├── src
-│       │   ├── components
-│       │   ├── layouts
-│       │   ├── pages
-│       │   ├── App.jsx
-│       │   ├── index.css
-│       │   └── main.jsx
-│       ├── .env.example
-│       ├── index.html
-│       ├── package.json
-│       └── vite.config.js
-├── eslint.config.js
-├── package.json
-└── README.md
-```
+This repository now includes:
 
-## Available Pages
+- a React + Vite + Tailwind frontend
+- a Node.js + Express backend
+- PostgreSQL migrations and repositories
+- AI gateway abstraction for Claude and future providers
+- retrieval, workflow, feedback, and administration layers
+- multi-agent administration with 4 seeded prototype agents
+- agent-aware conversations, AI usage tracking, feedback, and generated documents
 
-- `/login`
-- `/dashboard`
-- `/assistant`
+## Architecture
 
-The dashboard includes:
+### Shared platform layers
 
-- 1 active card: Administrative Assistant
-- 3 disabled cards: Community Manager, Sales Agent, HR Agent
+- `apps/api/src/services/ConversationService.js`
+- `apps/api/src/services/PromptAssembler.js`
+- `apps/api/src/services/retrieval/`
+- `apps/api/src/services/ai-gateway/`
+- `apps/api/src/services/workflows/`
+- `apps/api/src/services/feedback/`
+- `apps/api/src/services/admin/`
 
-## API
+### Multi-agent model
 
-### Health Check
+Each agent has configurable:
 
-`GET /api/health`
+- code, name, description, status
+- default provider and model
+- prompt links
+- document links
+- workflow links
+- temperature, max tokens, timeout, retries
 
-Response:
+Conversations, generated documents, feedback, and AI usage are now explicitly linked to `agent_code`.
 
-```json
-{
-  "status": "ok"
-}
-```
+## Human Validation Rules
+
+The prototype enforces governance expectations from the H-Kids brief:
+
+- no automatic social publication
+- no automatic email or document sending
+- no automatic commercial discount or customer commitment
+- no automatic sensitive HR communication
+- generated documents must be reviewed and approved before export
+
+## Main Routes
+
+### User workspace
+
+- `GET /api/assistant/bootstrap`
+- `GET /api/conversations`
+- `POST /api/conversations`
+- `GET /api/conversations/:id`
+- `POST /api/conversations/:id/messages`
+
+### Administration
+
+- `GET /api/admin/dashboard`
+- `GET /api/admin/statistics`
+- `GET /api/admin/agents`
+- `POST /api/admin/agents`
+- `PUT /api/admin/agents/:id`
+- `DELETE /api/admin/agents/:id`
+- `GET /api/admin/settings`
+- `PUT /api/admin/settings`
+
+### AI governance
+
+- `GET /api/ai/providers`
+- `GET /api/ai/models`
+- `GET /api/ai/usage`
+- `GET /api/ai/statistics`
 
 ## Environment Variables
 
-Copy the example files before running locally:
+### API
 
-- `apps/api/.env.example` -> `apps/api/.env`
-- `apps/web/.env.example` -> `apps/web/.env`
+- `PORT`
+- `CLIENT_URL`
+- `DATABASE_URL`
+- `DB_SSL`
+- `ANTHROPIC_API_KEY`
+- `DEFAULT_PROVIDER`
+- `DEFAULT_MODEL`
+- `MAX_TOKENS`
+- `TEMPERATURE`
+- `ENABLE_STREAMING`
+- `MAX_RETRIES`
+- `REQUEST_TIMEOUT_MS`
+- `ENABLE_USAGE_TRACKING`
+- `EMBEDDING_PROVIDER`
+- `EMBEDDING_MODEL`
+- `OPENAI_API_KEY`
 
-## Install
+### Web
+
+- `VITE_API_BASE_URL`
+
+## Install and Run
 
 ```bash
 npm install
-```
-
-## Run in Development
-
-```bash
 npm run dev
 ```
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3001`
 
-## Production Build
+## Validation
 
 ```bash
+npm test
+npm run lint
 npm run build
 ```
 
-Build outputs:
+## Operations and Delivery
 
-- Frontend bundle: `apps/web/dist`
-- Backend bundle: `apps/api/dist`
+See `docs/OPERATIONS.md` for:
 
-## Code Quality
-
-```bash
-npm run lint
-npm run format:check
-```
-
-## Notes
-
-- Claude is intentionally not integrated.
-- No business logic or document generation is implemented.
-- PostgreSQL is scaffolded for future integration but not connected during startup.
+- H-Kids ownership checklist
+- backup and recovery procedure
+- agent administration workflow
+- how to add or modify an agent
+- administrator training checklist
+- subscriptions and transfer considerations

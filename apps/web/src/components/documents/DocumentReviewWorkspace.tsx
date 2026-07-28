@@ -284,6 +284,7 @@ export default function DocumentReviewWorkspace({
       conversationId: session.id,
       messageId: latestAssistantMessage?.id,
       documentId: selectedDocument.id,
+      agentCode: session.agentCode,
       originalText: selectedDocument.renderedPreview.replace(/<[^>]+>/g, ' ').trim(),
       correctedText,
       feedbackType,

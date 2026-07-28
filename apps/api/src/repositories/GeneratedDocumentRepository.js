@@ -7,18 +7,19 @@ export class GeneratedDocumentRepository {
     await this.pool.query(
       `
         INSERT INTO generated_documents (
-          id, conversation_id, document_type, reference, structured_document,
+          id, conversation_id, agent_code, document_type, reference, structured_document,
           resolved_variables, rendered_preview, validation_warnings, available_export_formats,
           approved, status, version, created_by, approved_by, approved_at, input, metadata
         )
         VALUES (
-          $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::jsonb, $9::jsonb,
-          $10, $11, $12, $13, $14, $15, $16::jsonb, $17::jsonb
+          $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9::jsonb, $10::jsonb,
+          $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb
         )
       `,
       [
         payload.id,
         payload.conversationId,
+        payload.agentCode || 'administrative-assistant',
         payload.documentType,
         payload.reference,
         JSON.stringify(payload.structuredDocument),
@@ -53,23 +54,25 @@ export class GeneratedDocumentRepository {
     await this.pool.query(
       `
         UPDATE generated_documents
-        SET structured_document = $2::jsonb,
-            resolved_variables = $3::jsonb,
-            rendered_preview = $4,
-            validation_warnings = $5::jsonb,
-            available_export_formats = $6::jsonb,
-            approved = $7,
-            status = $8,
-            version = $9,
-            approved_by = $10,
-            approved_at = $11,
-            input = $12::jsonb,
-            metadata = $13::jsonb,
+        SET agent_code = $2,
+            structured_document = $3::jsonb,
+            resolved_variables = $4::jsonb,
+            rendered_preview = $5,
+            validation_warnings = $6::jsonb,
+            available_export_formats = $7::jsonb,
+            approved = $8,
+            status = $9,
+            version = $10,
+            approved_by = $11,
+            approved_at = $12,
+            input = $13::jsonb,
+            metadata = $14::jsonb,
             updated_at = NOW()
         WHERE id = $1
       `,
       [
         documentId,
+        payload.agentCode || 'administrative-assistant',
         JSON.stringify(payload.structuredDocument),
         JSON.stringify(payload.resolvedVariables),
         payload.renderedPreview,
@@ -107,19 +110,31 @@ export class GeneratedDocumentRepository {
     return result.rows;
   }
 
-  async search(query, { limit = 50, offset = 0 } = {}) {
+  async search(query, { limit = 50, offset = 0, agentCode } = {}) {
+    const values = [`%${query}%`];
+    const clauses = [
+      'reference ILIKE $1',
+      'rendered_preview ILIKE $1',
+      'structured_document::text ILIKE $1',
+      'input::text ILIKE $1',
+    ];
+    let whereClause = `(${clauses.join(' OR ')})`;
+
+    if (agentCode) {
+      values.push(agentCode);
+      whereClause += ` AND agent_code = $${values.length}`;
+    }
+
+    values.push(limit, offset);
     const result = await this.pool.query(
       `
         SELECT *
         FROM generated_documents
-        WHERE reference ILIKE $1
-           OR rendered_preview ILIKE $1
-           OR structured_document::text ILIKE $1
-           OR input::text ILIKE $1
+        WHERE ${whereClause}
         ORDER BY updated_at DESC
-        LIMIT $2 OFFSET $3
+        LIMIT $${values.length - 1} OFFSET $${values.length}
       `,
-      [`%${query}%`, limit, offset]
+      values
     );
 
     return result.rows;

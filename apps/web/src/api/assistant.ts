@@ -27,6 +27,7 @@ export async function getAssistantBootstrap(): Promise<AssistantBootstrapRespons
 
 export async function createConversationSession(payload: {
   title: string;
+  agentCode: string;
   selectedPromptId: string;
   selectedDocumentIds: string[];
   currentContext: AssistantContext;
@@ -44,8 +45,9 @@ export async function createConversationSession(payload: {
   return parseResponse<AssistantSession>(response);
 }
 
-export async function listConversationSessions(): Promise<AssistantSession[]> {
-  const response = await fetch(`${API_BASE_URL}/api/conversations`);
+export async function listConversationSessions(agentCode?: string): Promise<AssistantSession[]> {
+  const query = agentCode ? `?agentCode=${encodeURIComponent(agentCode)}` : '';
+  const response = await fetch(`${API_BASE_URL}/api/conversations${query}`);
   const data = await parseResponse<{ items: AssistantSession[] }>(response);
   return data.items;
 }
@@ -59,6 +61,7 @@ export async function sendAssistantMessage(payload: {
   sessionId: string;
   provider: string;
   model: string;
+  agentCode: string;
   selectedPromptId: string;
   selectedDocumentIds: string[];
   currentContext: AssistantContext;
@@ -69,6 +72,7 @@ export async function sendAssistantMessage(payload: {
   requestPreview: {
     provider: string;
     model: string;
+    agentCode: string;
     assembledPrompt: string;
     retrieval: RetrievalSearchResponse;
   };
@@ -81,6 +85,7 @@ export async function sendAssistantMessage(payload: {
     body: JSON.stringify({
       provider: payload.provider,
       model: payload.model,
+      agentCode: payload.agentCode,
       selectedPromptId: payload.selectedPromptId,
       selectedDocumentIds: payload.selectedDocumentIds,
       currentContext: payload.currentContext,
@@ -94,6 +99,7 @@ export async function sendAssistantMessage(payload: {
     requestPreview: {
       provider: string;
       model: string;
+      agentCode: string;
       assembledPrompt: string;
       retrieval: RetrievalSearchResponse;
     };
@@ -248,6 +254,7 @@ export async function submitDocumentFeedback(payload: {
   conversationId: string;
   messageId?: string;
   documentId: string;
+  agentCode: string;
   originalText: string;
   correctedText: string;
   feedbackType: string;
@@ -265,8 +272,9 @@ export async function submitDocumentFeedback(payload: {
   return parseResponse(response);
 }
 
-export async function getFeedbackDashboard(): Promise<FeedbackDashboardData> {
-  const response = await fetch(`${API_BASE_URL}/api/feedback/dashboard`);
+export async function getFeedbackDashboard(agentCode?: string): Promise<FeedbackDashboardData> {
+  const query = agentCode ? `?agentCode=${encodeURIComponent(agentCode)}` : '';
+  const response = await fetch(`${API_BASE_URL}/api/feedback/dashboard${query}`);
   return parseResponse<FeedbackDashboardData>(response);
 }
 
@@ -307,11 +315,13 @@ export async function getAiUsage(filters: {
   provider?: string;
   model?: string;
   date?: string;
+  agentCode?: string;
 } = {}): Promise<{ items: AiUsageRecord[] }> {
   const params = new URLSearchParams();
   if (filters.provider) params.set('provider', filters.provider);
   if (filters.model) params.set('model', filters.model);
   if (filters.date) params.set('date', filters.date);
+  if (filters.agentCode) params.set('agentCode', filters.agentCode);
   const query = params.toString() ? `?${params.toString()}` : '';
   const response = await fetch(`${API_BASE_URL}/api/ai/usage${query}`);
   return parseResponse(response);
