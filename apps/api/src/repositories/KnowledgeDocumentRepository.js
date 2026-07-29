@@ -30,6 +30,7 @@ function computeCompleteness(document) {
 function computeQuality(document, completeness) {
   let score = completeness * 0.5;
   if (document.status === 'active') score += 20;
+  if (document.status === 'approved') score += 15;
   if (document.status === 'review') score += 10;
   if (document.viewCount > 0) score += 5;
   if (document.aiUsageCount > 0) score += 10;
@@ -79,6 +80,15 @@ export class KnowledgeDocumentRepository {
       lastReviewedAt: row.last_reviewed_at || null,
       lastReviewedBy: row.last_reviewed_by || '',
       deletedAt: row.deleted_at || null,
+      folderId: row.folder_id || null,
+      aiVisibility: row.ai_visibility !== false,
+      securityClassification: row.security_classification || 'internal',
+      downloadCount: Number(row.download_count || 0),
+      isFavorite: Boolean(row.is_favorite),
+      mimeType: row.mime_type || '',
+      checksum: row.checksum || '',
+      byteSize: Number(row.byte_size || 0),
+      storageKey: row.storage_key || '',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -141,6 +151,10 @@ export class KnowledgeDocumentRepository {
       values.push(filters.category);
       clauses.push(`category = $${values.length}`);
     }
+    if (filters.folderId) {
+      values.push(filters.folderId);
+      clauses.push(`folder_id = $${values.length}`);
+    }
     if (filters.collectionId) {
       values.push(filters.collectionId);
       clauses.push(`collection_id = $${values.length}`);
@@ -169,11 +183,13 @@ export class KnowledgeDocumentRepository {
     const order =
       filters.sort === 'views'
         ? 'view_count DESC'
-        : filters.sort === 'ai'
-          ? 'ai_usage_count DESC'
-          : filters.sort === 'title'
-            ? 'title ASC'
-            : 'updated_at DESC';
+        : filters.sort === 'downloads'
+          ? 'download_count DESC'
+          : filters.sort === 'ai'
+            ? 'ai_usage_count DESC'
+            : filters.sort === 'title'
+              ? 'title ASC'
+              : 'updated_at DESC';
 
     const limit = Math.min(Number(filters.limit || 500), 2000);
     const offset = Math.max(Number(filters.offset || 0), 0);
@@ -192,7 +208,7 @@ export class KnowledgeDocumentRepository {
   async listSources() {
     const result = await this.pool.query(
       `SELECT id, content, priority FROM knowledge_documents
-       WHERE deleted_at IS NULL AND status IN ('active', 'review')
+       WHERE deleted_at IS NULL AND status IN ('active', 'approved', 'review')
        ORDER BY created_at DESC`
     );
 
@@ -220,11 +236,14 @@ export class KnowledgeDocumentRepository {
           size, status, author, file_type, source_file_name, content, priority,
           collection_id, language, owner, version, review_date, expiration_date, notes,
           view_count, ai_usage_count, approval_count, rejection_count, feedback_score,
-          quality_score, completeness_score, last_reviewed_by
+          quality_score, completeness_score, last_reviewed_by,
+          folder_id, ai_visibility, security_classification, download_count, is_favorite,
+          mime_type, checksum, byte_size, storage_key
         )
         VALUES (
           $1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-          $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29
+          $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
+          $30,$31,$32,$33,$34,$35,$36,$37,$38
         )
       `,
       [
@@ -257,6 +276,15 @@ export class KnowledgeDocumentRepository {
         quality,
         completeness,
         document.lastReviewedBy || '',
+        document.folderId || null,
+        document.aiVisibility !== false,
+        document.securityClassification || 'internal',
+        document.downloadCount || 0,
+        Boolean(document.isFavorite),
+        document.mimeType || '',
+        document.checksum || '',
+        document.byteSize || 0,
+        document.storageKey || '',
       ]
     );
 
@@ -299,6 +327,15 @@ export class KnowledgeDocumentRepository {
           last_reviewed_at = $28,
           last_reviewed_by = $29,
           deleted_at = $30,
+          folder_id = $31,
+          ai_visibility = $32,
+          security_classification = $33,
+          download_count = $34,
+          is_favorite = $35,
+          mime_type = $36,
+          checksum = $37,
+          byte_size = $38,
+          storage_key = $39,
           updated_at = NOW()
         WHERE id = $1
       `,
@@ -333,6 +370,15 @@ export class KnowledgeDocumentRepository {
         document.lastReviewedAt || null,
         document.lastReviewedBy || '',
         document.deletedAt || null,
+        document.folderId || null,
+        document.aiVisibility !== false,
+        document.securityClassification || 'internal',
+        document.downloadCount || 0,
+        Boolean(document.isFavorite),
+        document.mimeType || '',
+        document.checksum || '',
+        document.byteSize || 0,
+        document.storageKey || '',
       ]
     );
 
@@ -680,6 +726,358 @@ export class KnowledgeDocumentRepository {
       },
       reviewBacklog: documents.filter((item) => item.status === 'review').length,
       managedTags: tags.length,
+    };
+  }
+
+  mapFolder(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      parentId: row.parent_id || null,
+      name: row.name,
+      description: row.description || '',
+      owner: row.owner || '',
+      status: row.status,
+      isFavorite: Boolean(row.is_favorite),
+      isPinned: Boolean(row.is_pinned),
+      sortOrder: Number(row.sort_order || 0),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async listFolders(filters = {}) {
+    const clauses = [];
+    const values = [];
+    if (!filters.includeDeleted) {
+      clauses.push(`status <> 'deleted'`);
+    }
+    if (filters.parentId === null) {
+      clauses.push(`parent_id IS NULL`);
+    } else if (filters.parentId) {
+      values.push(filters.parentId);
+      clauses.push(`parent_id = $${values.length}`);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await this.pool.query(
+      `SELECT * FROM document_folders ${where} ORDER BY is_pinned DESC, sort_order ASC, name ASC`,
+      values
+    );
+    return result.rows.map((row) => this.mapFolder(row));
+  }
+
+  async getFolderById(id) {
+    const result = await this.pool.query('SELECT * FROM document_folders WHERE id = $1 LIMIT 1', [
+      id,
+    ]);
+    return this.mapFolder(result.rows[0]);
+  }
+
+  async createFolder(payload) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `INSERT INTO document_folders (
+        id, parent_id, name, description, owner, status, is_favorite, is_pinned, sort_order
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [
+        id,
+        payload.parentId || null,
+        payload.name,
+        payload.description || '',
+        payload.owner || '',
+        payload.status || 'active',
+        Boolean(payload.isFavorite),
+        Boolean(payload.isPinned),
+        payload.sortOrder ?? 0,
+      ]
+    );
+    return this.getFolderById(id);
+  }
+
+  async updateFolder(id, payload) {
+    const existing = await this.getFolderById(id);
+    if (!existing) return null;
+    const next = { ...existing, ...payload };
+    await this.pool.query(
+      `UPDATE document_folders SET
+        parent_id=$2, name=$3, description=$4, owner=$5, status=$6,
+        is_favorite=$7, is_pinned=$8, sort_order=$9, updated_at=NOW()
+       WHERE id=$1`,
+      [
+        id,
+        next.parentId || null,
+        next.name,
+        next.description || '',
+        next.owner || '',
+        next.status || 'active',
+        Boolean(next.isFavorite),
+        Boolean(next.isPinned),
+        next.sortOrder ?? 0,
+      ]
+    );
+    return this.getFolderById(id);
+  }
+
+  async getFolderBreadcrumb(folderId) {
+    const crumbs = [];
+    let currentId = folderId;
+    const guard = new Set();
+    while (currentId && !guard.has(currentId)) {
+      guard.add(currentId);
+      const folder = await this.getFolderById(currentId);
+      if (!folder) break;
+      crumbs.unshift(folder);
+      currentId = folder.parentId;
+    }
+    return crumbs;
+  }
+
+  async createDocumentFile(payload) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `INSERT INTO knowledge_document_files (
+        id, document_id, storage_key, original_name, mime_type, extension, byte_size,
+        checksum, version, ocr_status, virus_scan_status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        id,
+        payload.documentId,
+        payload.storageKey,
+        payload.originalName || '',
+        payload.mimeType || 'application/octet-stream',
+        payload.extension || '',
+        payload.byteSize || 0,
+        payload.checksum || '',
+        payload.version || 1,
+        payload.ocrStatus || 'pending',
+        payload.virusScanStatus || 'pending',
+      ]
+    );
+    return this.listDocumentFiles(payload.documentId).then((items) =>
+      items.find((item) => item.id === id)
+    );
+  }
+
+  async listDocumentFiles(documentId) {
+    const result = await this.pool.query(
+      `SELECT * FROM knowledge_document_files WHERE document_id = $1 ORDER BY version DESC, created_at DESC`,
+      [documentId]
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      documentId: row.document_id,
+      storageKey: row.storage_key,
+      originalName: row.original_name,
+      mimeType: row.mime_type,
+      extension: row.extension,
+      byteSize: Number(row.byte_size || 0),
+      checksum: row.checksum,
+      version: row.version,
+      ocrStatus: row.ocr_status,
+      virusScanStatus: row.virus_scan_status,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async addDmsAudit(payload) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `INSERT INTO dms_audit_events (id, document_id, folder_id, event_type, actor, summary, metadata)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+      [
+        id,
+        payload.documentId || null,
+        payload.folderId || null,
+        payload.eventType,
+        payload.actor || '',
+        payload.summary || '',
+        JSON.stringify(payload.metadata || {}),
+      ]
+    );
+    return id;
+  }
+
+  async listDmsAudit(filters = {}) {
+    const clauses = [];
+    const values = [];
+    if (filters.documentId) {
+      values.push(filters.documentId);
+      clauses.push(`document_id = $${values.length}`);
+    }
+    if (filters.folderId) {
+      values.push(filters.folderId);
+      clauses.push(`folder_id = $${values.length}`);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    values.push(Math.min(Number(filters.limit || 100), 500));
+    const result = await this.pool.query(
+      `SELECT * FROM dms_audit_events ${where} ORDER BY created_at DESC LIMIT $${values.length}`,
+      values
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      documentId: row.document_id,
+      folderId: row.folder_id,
+      eventType: row.event_type,
+      actor: row.actor,
+      summary: row.summary,
+      metadata: asJson(row.metadata, {}),
+      createdAt: row.created_at,
+    }));
+  }
+
+  async createUploadSession(payload) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `INSERT INTO dms_upload_sessions (
+        id, filename, total_chunks, received_chunks, byte_size, checksum, status, actor, metadata
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)`,
+      [
+        id,
+        payload.filename || '',
+        payload.totalChunks || 1,
+        payload.receivedChunks || 0,
+        payload.byteSize || 0,
+        payload.checksum || '',
+        payload.status || 'open',
+        payload.actor || '',
+        JSON.stringify(payload.metadata || {}),
+      ]
+    );
+    return this.getUploadSession(id);
+  }
+
+  async getUploadSession(id) {
+    const result = await this.pool.query('SELECT * FROM dms_upload_sessions WHERE id = $1 LIMIT 1', [
+      id,
+    ]);
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      filename: row.filename,
+      totalChunks: row.total_chunks,
+      receivedChunks: row.received_chunks,
+      byteSize: Number(row.byte_size || 0),
+      checksum: row.checksum,
+      status: row.status,
+      actor: row.actor,
+      metadata: asJson(row.metadata, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async updateUploadSession(id, payload) {
+    const existing = await this.getUploadSession(id);
+    if (!existing) return null;
+    const next = { ...existing, ...payload };
+    await this.pool.query(
+      `UPDATE dms_upload_sessions SET
+        filename=$2, total_chunks=$3, received_chunks=$4, byte_size=$5, checksum=$6,
+        status=$7, metadata=$8::jsonb, updated_at=NOW()
+       WHERE id=$1`,
+      [
+        id,
+        next.filename || '',
+        next.totalChunks || 1,
+        next.receivedChunks || 0,
+        next.byteSize || 0,
+        next.checksum || '',
+        next.status || 'open',
+        JSON.stringify(next.metadata || {}),
+      ]
+    );
+    return this.getUploadSession(id);
+  }
+
+  async getDmsDashboardStats() {
+    const documents = await this.list({ includeDeleted: false });
+    const folders = await this.listFolders();
+    const collections = await this.listCollections();
+    const storageBytes = documents.reduce((sum, item) => sum + Number(item.byteSize || 0), 0);
+
+    return {
+      totalDocuments: documents.length,
+      folders: folders.filter((item) => item.status === 'active').length,
+      collections: collections.length,
+      draft: documents.filter((item) => item.status === 'draft').length,
+      review: documents.filter((item) => item.status === 'review').length,
+      approved: documents.filter((item) => item.status === 'approved').length,
+      published: documents.filter((item) => item.status === 'active').length,
+      archived: documents.filter((item) => item.status === 'archived').length,
+      storageUsageBytes: storageBytes,
+      storageUsageLabel: `${(storageBytes / (1024 * 1024)).toFixed(2)} MB`,
+      recentlyUploaded: [...documents]
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        .slice(0, 5),
+      recentlyModified: [...documents]
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+        .slice(0, 5),
+      mostViewed: [...documents].sort((a, b) => b.viewCount - a.viewCount).slice(0, 5),
+      mostDownloaded: [...documents].sort((a, b) => b.downloadCount - a.downloadCount).slice(0, 5),
+      usedByAi: [...documents].sort((a, b) => b.aiUsageCount - a.aiUsageCount).slice(0, 5),
+      pendingApprovals: documents.filter(
+        (item) => item.status === 'review' || item.status === 'approved'
+      ).length,
+      documentQuality:
+        documents.length > 0
+          ? Number(
+              (
+                documents.reduce((sum, item) => sum + Number(item.qualityScore || 0), 0) /
+                documents.length
+              ).toFixed(1)
+            )
+          : 0,
+    };
+  }
+
+  async getDmsAnalytics() {
+    const documents = await this.list({ includeDeleted: false });
+    const folders = await this.listFolders();
+    const unused = documents.filter(
+      (item) => item.viewCount === 0 && item.downloadCount === 0 && item.aiUsageCount === 0
+    );
+    const stale = documents.filter((item) => {
+      const updated = new Date(item.updatedAt || item.updatedDate || 0).getTime();
+      return Number.isFinite(updated) && Date.now() - updated > 1000 * 60 * 60 * 24 * 90;
+    });
+    const decided = documents.filter((item) => item.approvalCount + item.rejectionCount > 0);
+
+    return {
+      mostViewed: [...documents].sort((a, b) => b.viewCount - a.viewCount).slice(0, 10),
+      mostDownloaded: [...documents].sort((a, b) => b.downloadCount - a.downloadCount).slice(0, 10),
+      mostUsedByAi: [...documents].sort((a, b) => b.aiUsageCount - a.aiUsageCount).slice(0, 10),
+      unusedDocuments: unused.slice(0, 20),
+      storageUsageBytes: documents.reduce((sum, item) => sum + Number(item.byteSize || 0), 0),
+      growth: {
+        total: documents.length,
+        published: documents.filter((item) => item.status === 'active').length,
+        draft: documents.filter((item) => item.status === 'draft').length,
+      },
+      reviewBacklog: documents.filter((item) => item.status === 'review').length,
+      approvalRate: decided.length
+        ? Number(
+            (
+              (decided.reduce((sum, item) => sum + item.approvalCount, 0) /
+                decided.reduce((sum, item) => sum + item.approvalCount + item.rejectionCount, 0)) *
+              100
+            ).toFixed(1)
+          )
+        : 0,
+      freshness: {
+        fresh: documents.length - stale.length,
+        stale: stale.length,
+      },
+      versionActivity: documents
+        .map((item) => ({ id: item.id, title: item.title, version: item.version }))
+        .sort((a, b) => b.version - a.version)
+        .slice(0, 20),
+      folderUsage: folders.map((folder) => ({
+        id: folder.id,
+        name: folder.name,
+        documents: documents.filter((item) => item.folderId === folder.id).length,
+      })),
     };
   }
 }

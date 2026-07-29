@@ -8,6 +8,7 @@ const DOCUMENTS_PREFIX = '/documents';
 const KNOWLEDGE_PREFIX = '/knowledge';
 const PROMPTS_PREFIX = '/prompts';
 const PROMPT_PLATFORM_PREFIX = '/prompt-platform';
+const DMS_PREFIX = '/dms';
 const CONVERSATIONS_PREFIX = '/conversations';
 const ASSISTANT_PREFIX = '/assistant';
 const RETRIEVAL_PREFIX = '/retrieval';
@@ -144,6 +145,29 @@ export function authorizeAccess(request, response, next) {
         path.includes('/deprecate') ||
         path.includes('/libraries') ||
         path.includes('/playground')) &&
+      !hasMinimumRole(role, ROLES.MANAGER)
+    ) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  if (path.startsWith(DMS_PREFIX)) {
+    if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    if (
+      writeRequest &&
+      (path.includes('/publish') ||
+        path.includes('/approve') ||
+        path.includes('/archive') ||
+        path.includes('/import') ||
+        path.includes('/folders')) &&
       !hasMinimumRole(role, ROLES.MANAGER)
     ) {
       deny(response);

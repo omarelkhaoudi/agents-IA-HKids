@@ -17,6 +17,7 @@ import HrAgentPage from './pages/HrAgentPage';
 import DashboardPage from './pages/DashboardPage';
 import FeedbackDashboardPage from './pages/FeedbackDashboardPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
+import DocumentsPage from './pages/DocumentsPage';
 import LoginPage from './pages/LoginPage';
 import PromptBuilderPage from './pages/PromptBuilderPage';
 import SetupWizardPage from './pages/SetupWizardPage';
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/assistant" element={<AdministrativeAssistantPage />} />
           <Route path="/feedback-dashboard" element={<FeedbackDashboardPage />} />
           <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/prompt-builder" element={<PromptBuilderPage />} />
           <Route element={<ProtectedRoute minRole="manager" />}>
             <Route path="/ai-administration" element={<AiAdministrationPage />} />

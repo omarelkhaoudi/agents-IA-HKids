@@ -284,7 +284,8 @@ export class KnowledgePlatformService {
 
     const allowed = {
       draft: ['review', 'archived', 'deleted'],
-      review: ['draft', 'active', 'archived', 'deleted'],
+      review: ['draft', 'approved', 'active', 'archived', 'deleted'],
+      approved: ['active', 'review', 'archived', 'deleted'],
       active: ['review', 'archived', 'deleted'],
       archived: ['draft', 'active', 'deleted'],
       deleted: [],
@@ -300,7 +301,7 @@ export class KnowledgePlatformService {
       status: nextStatus,
     };
 
-    if (nextStatus === 'active') {
+    if (nextStatus === 'active' || nextStatus === 'approved') {
       patch.approvalCount = Number(existing.approvalCount || 0) + 1;
       patch.lastReviewedAt = new Date().toISOString();
       patch.lastReviewedBy = actor;

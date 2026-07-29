@@ -72,6 +72,7 @@ export default function AppShell() {
     if (location.pathname.startsWith('/administration')) return 'Administration';
     if (location.pathname.startsWith('/assistant')) return 'AI Workspace';
     if (location.pathname.startsWith('/knowledge-base')) return 'Knowledge Base';
+    if (location.pathname.startsWith('/documents')) return 'Documents';
     if (location.pathname.startsWith('/prompt-builder')) return 'Prompt Builder';
     if (location.pathname.startsWith('/feedback-dashboard')) return 'Feedback';
     if (location.pathname.startsWith('/ai-administration')) return 'Analytics';
@@ -168,6 +169,7 @@ export default function AppShell() {
           </div>
 
           <NavItem to="/knowledge-base" label="Knowledge Base" icon="▣" collapsed={collapsed} />
+          <NavItem to="/documents" label="Documents" icon="▤" collapsed={collapsed} />
           <NavItem to="/prompt-builder" label="Prompt Builder" icon="✎" collapsed={collapsed} />
           <NavItem to="/assistant" label="Workflows" icon="⇄" collapsed={collapsed} />
           <NavItem to="/feedback-dashboard" label="Feedback" icon="★" collapsed={collapsed} />

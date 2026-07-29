@@ -9,3 +9,4 @@ test-results/
 playwright-report/
 backups/
 apps/api/config/runtime-secrets.json
+apps/api/storage/

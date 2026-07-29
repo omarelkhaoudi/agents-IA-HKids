@@ -18,6 +18,7 @@ import generatedDocumentsRouter from './routes/generated-documents.routes.js';
 import healthRouter from './routes/health.routes.js';
 import promptsRouter from './routes/prompts.routes.js';
 import promptPlatformRouter from './routes/prompt-platform.routes.js';
+import dmsRouter from './routes/dms.routes.js';
 import retrievalRouter from './routes/retrieval.routes.js';
 import setupRouter from './routes/setup.routes.js';
 import communityManagerRouter from './routes/community-manager.routes.js';
@@ -64,6 +65,7 @@ export function createApp() {
   app.use('/api', protectedMiddleware, generatedDocumentsRouter);
   app.use('/api', protectedMiddleware, promptsRouter);
   app.use('/api', protectedMiddleware, promptPlatformRouter);
+  app.use('/api', protectedMiddleware, dmsRouter);
   app.use('/api', protectedMiddleware, retrievalRouter);
   app.use('/api', protectedMiddleware, workflowRouter);
 

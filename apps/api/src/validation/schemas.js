@@ -130,18 +130,24 @@ export const documentBodySchema = z.object({
   description: mediumText.optional(),
   tags: z.array(z.string().trim().max(80)).max(30).default([]),
   size: z.string().trim().max(50).optional(),
-  status: z.enum(['draft', 'active', 'review', 'archived', 'deleted']).optional(),
+  status: z.enum(['draft', 'review', 'approved', 'active', 'archived', 'deleted']).optional(),
   author: z.string().trim().max(255).optional(),
   owner: z.string().trim().max(255).optional(),
   language: z.string().trim().max(20).optional(),
   collectionId: idSchema.nullable().optional(),
+  folderId: idSchema.nullable().optional(),
   priority: z.number().int().min(0).max(10).optional(),
   reviewDate: z.string().trim().max(80).optional(),
   expirationDate: z.string().trim().max(80).optional(),
   notes: mediumText.optional(),
   content: longText.optional(),
-  fileType: z.enum(['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV', 'MD', 'HTML']).optional(),
+  fileType: z
+    .enum(['PDF', 'DOCX', 'XLSX', 'PPTX', 'TXT', 'CSV', 'MD', 'HTML', 'PNG', 'JPEG', 'SVG', 'ZIP'])
+    .optional(),
   sourceFileName: z.string().trim().max(255).optional(),
+  aiVisibility: z.boolean().optional(),
+  securityClassification: z.enum(['public', 'internal', 'confidential', 'restricted']).optional(),
+  isFavorite: z.boolean().optional(),
 });
 
 export const knowledgeCollectionBodySchema = z.object({
@@ -305,6 +311,88 @@ export const promptPlaygroundBodySchema = z.object({
 export const promptFeedbackSuggestionBodySchema = z.object({
   suggestion: mediumText,
   actor: z.string().trim().max(255).optional(),
+});
+
+export const dmsFolderBodySchema = z.object({
+  name: shortText,
+  description: mediumText.optional(),
+  parentId: idSchema.nullable().optional(),
+  owner: z.string().trim().max(255).optional(),
+  status: z.enum(['active', 'archived', 'deleted']).optional(),
+  isFavorite: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+
+export const dmsUploadBodySchema = z.object({
+  filename: shortText,
+  contentBase64: z.string().min(1),
+  mimeType: z.string().trim().max(120).optional(),
+  title: shortText.optional(),
+  description: mediumText.optional(),
+  category: shortText.optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+  folderId: idSchema.nullable().optional(),
+  collectionId: idSchema.nullable().optional(),
+  language: z.string().trim().max(20).optional(),
+  owner: z.string().trim().max(255).optional(),
+  author: z.string().trim().max(255).optional(),
+  status: z.enum(['draft', 'review', 'approved', 'active', 'archived']).optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  aiVisibility: z.boolean().optional(),
+  securityClassification: z.enum(['public', 'internal', 'confidential', 'restricted']).optional(),
+  notes: mediumText.optional(),
+  overwriteDocumentId: idSchema.optional(),
+  allowDuplicate: z.boolean().optional(),
+  uploadSessionId: idSchema.optional(),
+});
+
+export const dmsUploadSessionBodySchema = z.object({
+  filename: shortText,
+  mimeType: z.string().trim().max(120).optional(),
+  byteSize: z.number().int().min(0).optional(),
+  totalChunks: z.number().int().min(1).max(10000).optional(),
+  folderId: idSchema.nullable().optional(),
+  collectionId: idSchema.nullable().optional(),
+  overwriteDocumentId: idSchema.optional(),
+});
+
+export const dmsChunkBodySchema = z.object({
+  chunkIndex: z.number().int().min(0).optional(),
+  checksum: z.string().trim().max(128).optional(),
+});
+
+export const dmsMoveBodySchema = z.object({
+  documentIds: z.array(idSchema).min(1).max(200),
+  folderId: idSchema.nullable().optional(),
+});
+
+export const dmsWorkflowBodySchema = z.object({
+  comment: mediumText.optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const dmsImportBodySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: idSchema.optional(),
+        title: shortText,
+        category: shortText,
+        description: mediumText.optional(),
+        tags: z.array(z.string().trim().max(80)).max(30).optional(),
+        folderId: idSchema.nullable().optional(),
+        collectionId: idSchema.nullable().optional(),
+        status: z.enum(['draft', 'review', 'approved', 'active', 'archived']).optional(),
+        language: z.string().trim().max(20).optional(),
+        owner: z.string().trim().max(255).optional(),
+        author: z.string().trim().max(255).optional(),
+        fileType: z
+          .enum(['PDF', 'DOCX', 'XLSX', 'PPTX', 'TXT', 'CSV', 'MD', 'HTML', 'PNG', 'JPEG', 'SVG', 'ZIP'])
+          .optional(),
+      })
+    )
+    .max(500),
 });
 
 export const retrievalSearchBodySchema = z.object({

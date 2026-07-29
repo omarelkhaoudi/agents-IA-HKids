@@ -5,6 +5,7 @@ import { KnowledgeDocumentRepository } from '../../repositories/KnowledgeDocumen
 import { PromptDefinitionRepository } from '../../repositories/PromptDefinitionRepository.js';
 import { KnowledgePlatformService } from '../knowledge/KnowledgePlatformService.js';
 import { PromptPlatformService } from '../prompt/PromptPlatformService.js';
+import { DocumentManagementService } from '../dms/DocumentManagementService.js';
 
 function getDisplayDate() {
   return new Intl.DateTimeFormat('en-GB', {
@@ -39,6 +40,11 @@ export class ContentCatalogService {
       promptRepository: this.promptRepository,
       refreshCaches: () => this.refreshCaches(),
     });
+    this.documentManagement = new DocumentManagementService(pool, {
+      documentRepository: this.documentRepository,
+      knowledgePlatform: this.knowledgePlatform,
+      refreshCaches: () => this.refreshCaches(),
+    });
     this.documentsCache = [];
     this.promptsCache = [];
     this.sourcesCache = [];
@@ -48,6 +54,7 @@ export class ContentCatalogService {
     await this.seedIfEmpty();
     await this.knowledgePlatform.seedCollectionsIfEmpty();
     await this.promptPlatform.seedLibrariesIfEmpty();
+    await this.documentManagement.seedFoldersIfEmpty();
     await this.refreshCaches();
   }
 

@@ -9,6 +9,7 @@ const routeBySection: Record<string, string> = {
   'Conversation History': '/assistant',
   Templates: '/prompt-builder',
   'Knowledge Base': '/knowledge-base',
+  Documents: '/documents',
   'Generated Documents': '/assistant',
   Settings: '/assistant',
 };
