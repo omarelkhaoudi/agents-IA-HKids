@@ -9,6 +9,7 @@ const PROMPTS_PREFIX = '/prompts';
 const CONVERSATIONS_PREFIX = '/conversations';
 const ASSISTANT_PREFIX = '/assistant';
 const RETRIEVAL_PREFIX = '/retrieval';
+const COMMUNITY_MANAGER_PREFIX = '/community-manager';
 
 function getPath(request) {
   const fullPath = request.originalUrl || request.url || request.path || '';
@@ -113,6 +114,28 @@ export function authorizeAccess(request, response, next) {
 
   if (path.startsWith(RETRIEVAL_PREFIX)) {
     if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  if (path.startsWith(COMMUNITY_MANAGER_PREFIX)) {
+    if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    if (
+      writeRequest &&
+      (path.includes('/approve') ||
+        path.includes('/reject') ||
+        path.includes('/guidelines') ||
+        path.includes('/library')) &&
+      !hasMinimumRole(role, ROLES.MANAGER)
+    ) {
       deny(response);
       return;
     }

@@ -150,17 +150,30 @@ export default function PromptBuilderPage() {
 
         <div className="space-y-6">
           <Panel className="p-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
               Prompt Builder
             </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-              Prompt orchestration for the Administrative Assistant
+            <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              Professional prompt editor
             </h1>
-            <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-300">
-              Design, version, compare, archive, restore, and preview agent prompts through a
-              production-ready interface that prepares future LLM integrations without calling any
-              model today.
+            <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-400">
+              Edit sections and variables, preview assembled prompts, save versions, compare history,
+              and test drafts before promoting them to agents.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                Sections
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                Variables
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                Live preview
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                Version history
+              </span>
+            </div>
           </Panel>
 
           {loading ? (

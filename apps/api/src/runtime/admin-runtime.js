@@ -78,7 +78,18 @@ export async function initializeAdminRuntime() {
       maxTokens: env.maxTokens,
       timeout: env.requestTimeoutMs,
       retryCount: env.maxRetries,
-      promptIds: ['prompt-001'],
+      promptIds:
+        blueprint.code === 'community-manager'
+          ? [
+              'prompt-cm-instagram-001',
+              'prompt-cm-facebook-001',
+              'prompt-cm-linkedin-001',
+              'prompt-cm-story-001',
+              'prompt-cm-campaign-001',
+              'prompt-cm-parents-001',
+              'prompt-cm-schools-001',
+            ]
+          : ['prompt-001'],
       documentIds: ['doc-001', 'doc-002'],
       workflowCodes: blueprint.workflowCodes,
     });

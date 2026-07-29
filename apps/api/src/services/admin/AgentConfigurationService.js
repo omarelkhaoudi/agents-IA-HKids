@@ -49,7 +49,7 @@ export class AgentConfigurationService {
         code: 'community-manager',
         name: 'Community Manager IA',
         description: 'Prepares publications, stories, editorial calendars, and community replies.',
-        workflowCodes: ['document-review'],
+        workflowCodes: ['document-review', 'export-approval'],
       },
       {
         code: 'administrative-assistant',

@@ -28,18 +28,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl shadow-slate-950/40 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden bg-gradient-to-br from-cyan-500 via-sky-500 to-indigo-600 p-10 lg:flex lg:flex-col lg:justify-between">
+    <div className="flex min-h-screen items-center justify-center px-6 py-10">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-[rgba(15,23,42,0.85)] shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative hidden overflow-hidden bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-700 p-10 lg:flex lg:flex-col lg:justify-between">
+          <div className="pointer-events-none absolute -right-8 top-10 h-40 w-40 rounded-full bg-white/20 blur-2xl" />
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-50/80">
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-50/80">
               H-Kids Platform
             </p>
-            <h1 className="mt-6 max-w-md text-4xl font-semibold leading-tight text-white">
+            <h1 className="font-display mt-6 max-w-md text-4xl font-semibold leading-tight text-white">
               Secure access to your multi-agent AI workspace.
             </h1>
           </div>
-          <p className="max-w-md text-sm leading-6 text-cyan-50/90">
+          <p className="max-w-md text-sm leading-7 text-cyan-50/90">
             Sign in with your H-Kids account to manage agents, documents, workflows, and human
             validation processes.
           </p>
@@ -47,8 +48,10 @@ export default function LoginPage() {
 
         <section className="p-8 sm:p-10">
           <div className="mx-auto max-w-md">
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-cyan-300">Sign In</p>
-            <h2 className="mt-4 text-3xl font-semibold text-white">Welcome back</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
+              Sign In
+            </p>
+            <h2 className="font-display mt-4 text-3xl font-semibold text-white">Welcome back</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">
               Use your administrator credentials to access the platform.
             </p>
@@ -63,7 +66,7 @@ export default function LoginPage() {
                   placeholder="admin@hkids.app"
                   autoComplete="email"
                   required
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-400"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400"
                 />
               </label>
 
@@ -76,7 +79,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-400"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400"
                 />
               </label>
 
@@ -89,7 +92,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || isLoading}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Signing in...' : 'Enter platform'}
               </button>

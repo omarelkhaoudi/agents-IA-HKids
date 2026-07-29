@@ -205,3 +205,107 @@ export const exportTypeParamsSchema = z.object({
 export const exportQuerySchema = z.object({
   format: z.enum(['json', 'csv']).default('json'),
 });
+
+const cmPlatformSchema = z.enum([
+  'facebook',
+  'instagram',
+  'linkedin',
+  'x',
+  'story',
+  'newsletter',
+  'other',
+]);
+
+export const cmCampaignBodySchema = z.object({
+  name: shortText,
+  objective: mediumText.optional(),
+  targetAudience: mediumText.optional(),
+  platforms: z.array(cmPlatformSchema).max(10).optional(),
+  startDate: z.string().trim().max(40).optional().nullable(),
+  endDate: z.string().trim().max(40).optional().nullable(),
+  status: z.enum(['draft', 'active', 'completed', 'archived']).optional(),
+  approvalStatus: z.enum(['draft', 'pending_review', 'approved', 'rejected']).optional(),
+  performanceNotes: mediumText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const cmPostBodySchema = z.object({
+  campaignId: idSchema.optional().nullable(),
+  title: shortText,
+  objective: mediumText.optional(),
+  audience: shortText.optional(),
+  platform: cmPlatformSchema.optional(),
+  theme: shortText.optional(),
+  contentType: shortText.optional(),
+  tone: shortText.optional(),
+  status: z.enum(['draft', 'scheduled', 'published_manual', 'archived']).optional(),
+  approvalStatus: z
+    .enum(['draft', 'pending_review', 'approved', 'rejected', 'exported'])
+    .optional(),
+  scheduledFor: z.string().trim().max(60).optional().nullable(),
+  colorLabel: shortText.optional(),
+  headline: mediumText.optional(),
+  body: longText.optional(),
+  cta: mediumText.optional(),
+  hashtags: z.array(z.string().max(80)).max(40).optional(),
+  keywords: z.array(z.string().max(80)).max(40).optional(),
+  emojiSuggestions: z.array(z.string().max(16)).max(20).optional(),
+  imageIdeas: z.array(z.string().max(200)).max(20).optional(),
+  timingSuggestion: mediumText.optional(),
+  alternatives: z.array(z.string().max(5000)).max(10).optional(),
+  sourcePrompt: longText.optional(),
+  conversationId: idSchema.optional().nullable(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const cmGenerateBodySchema = z.object({
+  instruction: longText.min(1),
+  title: shortText.optional(),
+  objective: mediumText.optional(),
+  audience: shortText.optional(),
+  platform: cmPlatformSchema.optional(),
+  theme: shortText.optional(),
+  contentType: shortText.optional(),
+  tone: shortText.optional(),
+  campaignId: idSchema.optional().nullable(),
+  scheduledFor: z.string().trim().max(60).optional().nullable(),
+  colorLabel: shortText.optional(),
+  promptId: idSchema.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const cmGuidelinesBodySchema = z.object({
+  brandTone: longText.optional(),
+  vocabulary: z.array(z.string().max(120)).max(100).optional(),
+  forbiddenExpressions: z.array(z.string().max(200)).max(100).optional(),
+  preferredExpressions: z.array(z.string().max(200)).max(100).optional(),
+  targetAudiences: z.array(z.string().max(120)).max(50).optional(),
+  communicationPrinciples: z.array(z.string().max(500)).max(50).optional(),
+  writingExamples: z.array(z.string().max(2000)).max(30).optional(),
+});
+
+export const cmLibraryBodySchema = z.object({
+  category: z.enum([
+    'template',
+    'approved_post',
+    'rejected_post',
+    'reusable_paragraph',
+    'cta',
+    'hashtag',
+    'campaign',
+  ]),
+  title: shortText,
+  content: longText.optional(),
+  tags: z.array(z.string().max(80)).max(40).optional(),
+  platform: cmPlatformSchema.optional().nullable(),
+  campaignId: idSchema.optional().nullable(),
+  postId: idSchema.optional().nullable(),
+  status: z.enum(['active', 'archived']).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const cmExportQuerySchema = z.object({
+  format: z.enum(['markdown', 'html', 'json']).default('markdown'),
+});

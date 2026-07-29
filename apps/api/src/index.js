@@ -4,6 +4,7 @@ import { initializeAuthRuntime } from './runtime/auth-runtime.js';
 import { initializeContentRuntime } from './runtime/content-runtime.js';
 import { initializeAdminRuntime } from './runtime/admin-runtime.js';
 import { initializeSetupRuntime } from './runtime/setup-runtime.js';
+import { initializeCommunityManagerRuntime } from './runtime/community-manager-runtime.js';
 import { healthService } from './runtime/health-runtime.js';
 import { workflowEngine } from './runtime/workflow-runtime.js';
 import { startServer } from './server.js';
@@ -19,6 +20,7 @@ await initializeContentRuntime();
 await workflowEngine.initialize();
 await initializeAdminRuntime();
 await initializeSetupRuntime();
+await initializeCommunityManagerRuntime();
 
 const readiness = await healthService.getReadiness();
 logger.info('startup_diagnostics', {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   createConversationSession,
   getAssistantBootstrap,
@@ -228,6 +229,7 @@ const agentDepartments: Record<string, string> = {
 const documentEnabledAgents = new Set(['administrative-assistant', 'sales-agent', 'hr-agent']);
 
 export default function AdministrativeAssistantPage() {
+  const [searchParams] = useSearchParams();
   const [selectedActionId, setSelectedActionId] = useState<DocumentKind>('quotation');
   const [selectedAgentCode, setSelectedAgentCode] = useState('administrative-assistant');
   const [bootstrap, setBootstrap] = useState<AssistantBootstrapResponse | null>(null);
@@ -248,6 +250,7 @@ export default function AdministrativeAssistantPage() {
     retrieval: RetrievalSearchResponse;
   } | null>(null);
   const [retrievalDebugResult, setRetrievalDebugResult] = useState<RetrievalSearchResponse | null>(null);
+  const requestedAgentCode = searchParams.get('agent') || '';
 
   const selectedActions = useMemo(
     () => actionsByAgent[selectedAgentCode] || defaultActions,
@@ -290,7 +293,14 @@ export default function AdministrativeAssistantPage() {
 
       try {
         const bootstrapResponse = await getAssistantBootstrap();
-        const defaultAgentCode = bootstrapResponse.defaultAgentCode || bootstrapResponse.agents[0]?.code || 'administrative-assistant';
+        const queryAgentCode = new URLSearchParams(window.location.search).get('agent') || '';
+        const defaultAgentCode =
+          (queryAgentCode &&
+            bootstrapResponse.agents.some((agent) => agent.code === queryAgentCode) &&
+            queryAgentCode) ||
+          bootstrapResponse.defaultAgentCode ||
+          bootstrapResponse.agents[0]?.code ||
+          'administrative-assistant';
         const existingSessions = await listConversationSessions(defaultAgentCode);
 
         setBootstrap(bootstrapResponse);
@@ -335,7 +345,19 @@ export default function AdministrativeAssistantPage() {
     void initializeAssistant();
   }, [syncSessionConfiguration]);
 
+  useEffect(() => {
+    if (!bootstrap || !requestedAgentCode || requestedAgentCode === selectedAgentCode) {
+      return;
+    }
 
+    if (!bootstrap.agents.some((agent) => agent.code === requestedAgentCode)) {
+      return;
+    }
+
+    void handleAgentChange(requestedAgentCode);
+    // handleAgentChange is stable enough for URL-driven agent switches
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrap, requestedAgentCode]);
 
   const refreshSessions = async (agentCode = selectedAgentCode) => {
     const refreshedSessions = await listConversationSessions(agentCode);
@@ -469,33 +491,41 @@ export default function AdministrativeAssistantPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
-        <ConversationSidebar
-          sessions={sessions}
-          selectedSessionId={selectedSession?.id || null}
-          onCreateSession={() => {
-            void handleCreateSession();
-          }}
-          onSelectSession={(sessionId) => {
-            void handleSelectSession(sessionId);
-          }}
-        />
+      <section className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+        <div className="space-y-3">
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Conversations
+          </p>
+          <ConversationSidebar
+            sessions={sessions}
+            selectedSessionId={selectedSession?.id || null}
+            onCreateSession={() => {
+              void handleCreateSession();
+            }}
+            onSelectSession={(sessionId) => {
+              void handleSelectSession(sessionId);
+            }}
+          />
+        </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <WelcomeHero
             agentName={selectedAgent?.name || 'H-Kids Agent'}
-            agentDescription={selectedAgent?.description || 'Governed draft preparation with human validation.'}
+            agentDescription={
+              selectedAgent?.description || 'Governed draft preparation with human validation.'
+            }
             selectedAction={selectedAction}
           />
 
-          <Panel className="p-6">
+          <Panel className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Agent Selection
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
-                  Choose the specialized agent. All outputs remain drafts and require human validation before any real-world action.
+                  Choose the specialized agent. All outputs remain drafts and require human
+                  validation.
                 </p>
               </div>
               <select
@@ -503,6 +533,7 @@ export default function AdministrativeAssistantPage() {
                 onChange={(event) => {
                   void handleAgentChange(event.target.value);
                 }}
+                aria-label="Select AI agent"
                 className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 lg:max-w-sm"
               >
                 {(bootstrap?.agents || []).map((agent) => (
@@ -514,16 +545,12 @@ export default function AdministrativeAssistantPage() {
             </div>
           </Panel>
 
-          <Panel className="p-6">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">
-                  Quick Actions
-                </p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Switch specialized workflows instantly to adapt the chat and review experience.
-                </p>
-              </div>
+          <Panel className="p-5">
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Quick Actions
+              </p>
+              <p className="mt-2 text-sm text-slate-400">Switch specialized workflows instantly.</p>
             </div>
             <QuickActions
               actions={selectedActions}
@@ -532,19 +559,23 @@ export default function AdministrativeAssistantPage() {
             />
           </Panel>
 
-          <Panel className="flex min-h-[540px] flex-col p-6">
-            <div className="border-b border-white/10 pb-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">
-                Agent Workspace Chat
+          <Panel className="flex min-h-[540px] flex-col overflow-hidden p-0">
+            <div className="border-b border-white/10 px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300/90">
+                AI Conversation
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Shared orchestration flow with provider abstraction, conversation sessions, prompt assembly, retrieval, and agent-specific governance.
+                ChatGPT-style workspace with prompt assembly, retrieval, and human validation.
               </p>
             </div>
 
-            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto py-6">
+            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-5">
               {loading ? (
-                <div className="text-sm text-slate-400">Loading assistant workspace...</div>
+                <div className="space-y-3">
+                  <div className="skeleton h-16 w-3/4" />
+                  <div className="skeleton h-16 w-full" />
+                  <div className="skeleton h-16 w-2/3" />
+                </div>
               ) : error ? (
                 <div className="rounded-2xl border border-rose-400/20 bg-rose-500/8 px-4 py-3 text-sm text-rose-200">
                   {error}
@@ -554,7 +585,7 @@ export default function AdministrativeAssistantPage() {
               )}
             </div>
 
-            <div className="border-t border-white/10 pt-5">
+            <div className="border-t border-white/10 px-5 py-4">
               <MessageComposer
                 actionLabel={selectedAction.label}
                 actionId={selectedActionId}
@@ -565,28 +596,33 @@ export default function AdministrativeAssistantPage() {
           </Panel>
         </div>
 
-        <ContextPanel
-          prompts={bootstrap?.prompts || []}
-          documents={bootstrap?.documents || []}
-          models={bootstrap?.models || []}
-          selectedPromptId={selectedPromptId}
-          selectedDocumentIds={selectedDocumentIds}
-          selectedModel={selectedModel}
-          currentContext={
-            currentContext || {
-              department: '',
-              language: '',
-              companyName: '',
-              companyAddress: '',
-              contactName: '',
+        <div className="space-y-3">
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Knowledge · Prompt · Context
+          </p>
+          <ContextPanel
+            prompts={bootstrap?.prompts || []}
+            documents={bootstrap?.documents || []}
+            models={bootstrap?.models || []}
+            selectedPromptId={selectedPromptId}
+            selectedDocumentIds={selectedDocumentIds}
+            selectedModel={selectedModel}
+            currentContext={
+              currentContext || {
+                department: '',
+                language: '',
+                companyName: '',
+                companyAddress: '',
+                contactName: '',
+              }
             }
-          }
-          requestPreview={requestPreview}
-          onPromptChange={setSelectedPromptId}
-          onDocumentToggle={handleToggleDocument}
-          onModelChange={setSelectedModel}
-          onContextChange={setCurrentContext}
-        />
+            requestPreview={requestPreview}
+            onPromptChange={setSelectedPromptId}
+            onDocumentToggle={handleToggleDocument}
+            onModelChange={setSelectedModel}
+            onContextChange={setCurrentContext}
+          />
+        </div>
       </section>
 
       <RetrievalDebugPanel
@@ -596,20 +632,29 @@ export default function AdministrativeAssistantPage() {
       />
 
       {documentEnabledAgents.has(selectedAgentCode) ? (
-        <DocumentReviewWorkspace
-          session={selectedSession}
-          selectedActionId={selectedActionId}
-          currentContext={currentContext}
-          onSessionRefresh={refreshCurrentSession}
-        />
+        <div className="space-y-3">
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Documents · Workflow · Feedback
+          </p>
+          <DocumentReviewWorkspace
+            session={selectedSession}
+            selectedActionId={selectedActionId}
+            currentContext={currentContext}
+            onSessionRefresh={refreshCurrentSession}
+          />
+        </div>
       ) : (
         <Panel className="p-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
             Human Validation Reminder
           </p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Draft-only communication workspace</h2>
+          <h2 className="font-display mt-2 text-2xl font-semibold text-white">
+            Draft-only communication workspace
+          </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            This agent prepares communication drafts and campaign material, but no publication or sending is automated. Final posting, sending, or external engagement stays under human control.
+            This agent prepares communication drafts and campaign material, but no publication or
+            sending is automated. Final posting, sending, or external engagement stays under human
+            control.
           </p>
         </Panel>
       )}
