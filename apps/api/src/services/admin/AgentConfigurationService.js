@@ -60,8 +60,9 @@ export class AgentConfigurationService {
       {
         code: 'sales-agent',
         name: 'Agent commercial IA',
-        description: 'Prepares qualification notes, proposals, follow-ups, and commercial drafts.',
-        workflowCodes: ['document-review'],
+        description:
+          'Prepares CRM drafts, quotations, proposals, and follow-ups with mandatory human approval.',
+        workflowCodes: ['document-review', 'export-approval'],
       },
       {
         code: 'hr-agent',

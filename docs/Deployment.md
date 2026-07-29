@@ -15,16 +15,19 @@
 cd assistant-administratif-ia
 npm install
 cp apps/api/.env.example apps/api/.env
-# Edit DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY
+# Edit DATABASE_URL (or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME), JWT_SECRET, ANTHROPIC_API_KEY
+npm run db:ensure
 npm run dev
 ```
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:3001`
 
-Set `VITE_API_BASE_URL` for the web app if the API is not at the default (build-time for Docker; Vite env for local).
+`npm run db:ensure` creates the configured database if it is missing (via the Node `pg` driver — `psql` is optional) and applies migrations `001`–`011`. Migrations also run automatically on API startup via `runMigrations` into `schema_migrations`.
 
-Migrations `001`–`009` run automatically on API startup via `runMigrations` into `schema_migrations`. There is no separate `npm run migrate`.
+If `DATABASE_URL` / `DB_*` are unset in development, the API uses in-memory PostgreSQL (`pg-mem`) so the UI can start without a local server. Prefer a real Postgres for persistent CRM/content data.
+
+Set `VITE_API_BASE_URL` for the web app if the API is not at the default (build-time for Docker; Vite env for local).
 
 ### First-time setup
 
@@ -74,11 +77,15 @@ From `apps/api/.env.example` and `config/env.js`:
 
 | Variable | Default / notes |
 |----------|-----------------|
-| `NODE_ENV` | `development` / `production` |
+| `NODE_ENV` | `development` / `production` / `test` |
 | `PORT` | `3001` |
 | `CLIENT_URL` | `http://localhost:5173` |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (preferred) |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Used when `DATABASE_URL` is empty |
 | `DB_SSL` | `false` |
+| `DB_CONNECT_RETRIES` | `10` (startup retry) |
+| `HKIDS_USE_IN_MEMORY_DB` | Force `pg-mem` |
+| `FORCE_REAL_DATABASE` | When `true`, API tests use real Postgres from env |
 | `JWT_SECRET` | Required in production |
 | `JWT_ACCESS_EXPIRES_IN` | `15m` |
 | `JWT_REFRESH_EXPIRES_IN_MS` | `604800000` (7 days) |

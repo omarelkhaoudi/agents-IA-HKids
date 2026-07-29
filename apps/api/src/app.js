@@ -19,6 +19,7 @@ import promptsRouter from './routes/prompts.routes.js';
 import retrievalRouter from './routes/retrieval.routes.js';
 import setupRouter from './routes/setup.routes.js';
 import communityManagerRouter from './routes/community-manager.routes.js';
+import salesAgentRouter from './routes/sales-agent.routes.js';
 import workflowRouter from './routes/workflow.routes.js';
 
 const protectedMiddleware = [authenticate, authorizeAccess];
@@ -52,6 +53,7 @@ export function createApp() {
   app.use('/api', protectedMiddleware, aiRouter);
   app.use('/api', protectedMiddleware, assistantRouter);
   app.use('/api', protectedMiddleware, communityManagerRouter);
+  app.use('/api', protectedMiddleware, salesAgentRouter);
   app.use('/api', protectedMiddleware, documentsRouter);
   app.use('/api', protectedMiddleware, feedbackRouter);
   app.use('/api', protectedMiddleware, generatedDocumentsRouter);

@@ -11,6 +11,7 @@
     "lint": "npm run lint -w @hkids/web && npm run lint -w @hkids/api",
     "test": "npm run test -w @hkids/api && npm run test -w @hkids/web",
     "test:e2e": "playwright test",
+    "db:ensure": "npm run db:ensure -w @hkids/api",
     "backup": "powershell -ExecutionPolicy Bypass -File ./scripts/backup.ps1",
     "restore": "powershell -ExecutionPolicy Bypass -File ./scripts/restore.ps1",
     "format": "prettier --write .",

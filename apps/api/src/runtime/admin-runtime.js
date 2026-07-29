@@ -89,7 +89,18 @@ export async function initializeAdminRuntime() {
               'prompt-cm-parents-001',
               'prompt-cm-schools-001',
             ]
-          : ['prompt-001'],
+          : blueprint.code === 'sales-agent'
+            ? [
+                'prompt-sales-qualification-001',
+                'prompt-sales-quotation-001',
+                'prompt-sales-proposal-001',
+                'prompt-sales-negotiation-001',
+                'prompt-sales-followup-001',
+                'prompt-sales-crosssell-001',
+                'prompt-sales-upsell-001',
+                'prompt-sales-objection-001',
+              ]
+            : ['prompt-001'],
       documentIds: ['doc-001', 'doc-002'],
       workflowCodes: blueprint.workflowCodes,
     });

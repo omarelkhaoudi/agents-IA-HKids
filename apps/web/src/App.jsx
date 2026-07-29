@@ -12,6 +12,7 @@ import AdminSettingsPage from './pages/administration/AdminSettingsPage';
 import AdminStatisticsPage from './pages/administration/AdminStatisticsPage';
 import AdminSystemStatusPage from './pages/administration/AdminSystemStatusPage';
 import CommunityManagerPage from './pages/CommunityManagerPage';
+import SalesAgentPage from './pages/SalesAgentPage';
 import DashboardPage from './pages/DashboardPage';
 import FeedbackDashboardPage from './pages/FeedbackDashboardPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
@@ -68,6 +69,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/community-manager" element={<CommunityManagerPage />} />
+          <Route path="/sales-agent" element={<SalesAgentPage />} />
           <Route path="/assistant" element={<AdministrativeAssistantPage />} />
           <Route path="/feedback-dashboard" element={<FeedbackDashboardPage />} />
           <Route path="/knowledge-base" element={<KnowledgeBasePage />} />

@@ -12,15 +12,45 @@ dotenv.config({
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 
+function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  const host = process.env.DB_HOST || '';
+  const port = process.env.DB_PORT || '5432';
+  const user = process.env.DB_USER || '';
+  const password = process.env.DB_PASSWORD || '';
+  const name = process.env.DB_NAME || '';
+
+  if (!host || !user || !name) {
+    return '';
+  }
+
+  const auth =
+    password !== undefined && password !== null
+      ? `${encodeURIComponent(user)}:${encodeURIComponent(password)}`
+      : encodeURIComponent(user);
+
+  return `postgresql://${auth}@${host}:${port}/${encodeURIComponent(name)}`;
+}
+
 export const env = {
   nodeEnv,
   port: Number(process.env.PORT || 3001),
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  databaseUrl: process.env.DATABASE_URL || '',
+  databaseUrl: resolveDatabaseUrl(),
+  dbHost: process.env.DB_HOST || '',
+  dbPort: process.env.DB_PORT || '5432',
+  dbUser: process.env.DB_USER || '',
+  dbPassword: process.env.DB_PASSWORD || '',
+  dbName: process.env.DB_NAME || '',
   dbSsl: process.env.DB_SSL === 'true',
   jwtSecret:
     process.env.JWT_SECRET ||
-    (nodeEnv === 'development' ? 'dev-only-jwt-secret-change-in-production' : ''),
+    (nodeEnv === 'development' || nodeEnv === 'test'
+      ? 'dev-only-jwt-secret-change-in-production'
+      : ''),
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   jwtRefreshExpiresInMs: Number(process.env.JWT_REFRESH_EXPIRES_IN_MS || 7 * 24 * 60 * 60 * 1000),
   defaultAdminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'admin@hkids.app',
@@ -57,7 +87,7 @@ export function assertProductionConfig() {
   }
 
   if (!env.databaseUrl) {
-    missing.push('DATABASE_URL');
+    missing.push('DATABASE_URL (or DB_HOST + DB_USER + DB_NAME)');
   }
 
   if (!env.clientUrl || env.clientUrl.includes('localhost')) {

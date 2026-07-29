@@ -4,7 +4,7 @@ import { UserRepository } from '../repositories/UserRepository.js';
 import { AuthService } from '../services/auth/AuthService.js';
 import { TokenService } from '../services/auth/TokenService.js';
 import { persistenceService } from './assistant-runtime.js';
-import { databasePool } from './database-runtime.js';
+import { databasePool, initializeDatabaseRuntime } from './database-runtime.js';
 
 const userRepository = new UserRepository(databasePool);
 const refreshTokenRepository = new RefreshTokenRepository(databasePool);
@@ -17,6 +17,7 @@ export const authService = new AuthService({
 });
 
 export async function initializeAuthRuntime() {
+  await initializeDatabaseRuntime();
   await persistenceService.initialize();
 
   const defaultAdmin = await authService.ensureDefaultAdmin({

@@ -23,8 +23,8 @@ const agents = [
       'Lead qualification, proposals, product suggestions, and follow-up drafts for commercial teams.',
     accent: 'orange',
     icon: 'SA',
-    workspaceTo: '/assistant?agent=sales-agent',
-    stats: 'Proposals',
+    workspaceTo: '/sales-agent',
+    stats: 'CRM & quotes',
   },
   {
     title: 'HR Agent',

@@ -309,3 +309,187 @@ export const cmLibraryBodySchema = z.object({
 export const cmExportQuerySchema = z.object({
   format: z.enum(['markdown', 'html', 'json']).default('markdown'),
 });
+
+const salesStageSchema = z.enum([
+  'new_lead',
+  'qualified',
+  'meeting',
+  'proposal',
+  'negotiation',
+  'won',
+  'lost',
+]);
+
+const salesApprovalSchema = z.enum([
+  'draft',
+  'pending_review',
+  'approved',
+  'rejected',
+  'exported',
+]);
+
+const salesDocumentTypeSchema = z.enum([
+  'proposal',
+  'quotation_summary',
+  'follow_up_email',
+  'meeting_summary',
+  'negotiation_strategy',
+  'sales_argument',
+  'faq',
+  'objection_handling',
+  'cross_sell',
+  'upsell',
+  'other',
+]);
+
+export const salesCompanyBodySchema = z.object({
+  name: shortText,
+  industry: shortText.optional(),
+  website: shortText.optional(),
+  phone: shortText.optional(),
+  email: z.string().trim().max(255).optional(),
+  address: mediumText.optional(),
+  tags: z.array(z.string().max(80)).max(40).optional(),
+  notes: longText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesProspectBodySchema = z.object({
+  companyId: idSchema.optional().nullable(),
+  fullName: shortText,
+  contactName: shortText.optional(),
+  phone: shortText.optional(),
+  email: z.string().trim().max(255).optional(),
+  status: z
+    .enum([
+      'new_lead',
+      'qualified',
+      'meeting',
+      'proposal',
+      'negotiation',
+      'won',
+      'lost',
+      'nurturing',
+    ])
+    .optional(),
+  source: shortText.optional(),
+  tags: z.array(z.string().max(80)).max(40).optional(),
+  notes: longText.optional(),
+  assignedUser: shortText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesProductBodySchema = z.object({
+  name: shortText,
+  category: shortText.optional(),
+  description: longText.optional(),
+  features: z.array(z.string().max(300)).max(50).optional(),
+  unitPrice: z.number().min(0).max(1_000_000_000).optional(),
+  currency: z.string().trim().max(8).optional(),
+  availability: z.enum(['available', 'limited', 'unavailable']).optional(),
+  internalNotes: longText.optional(),
+  knowledgeRefs: z.array(z.string().max(120)).max(40).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesDealBodySchema = z.object({
+  title: shortText,
+  companyId: idSchema.optional().nullable(),
+  prospectId: idSchema.optional().nullable(),
+  stage: salesStageSchema.optional(),
+  probability: z.number().int().min(0).max(100).optional(),
+  expectedRevenue: z.number().min(0).max(1_000_000_000).optional(),
+  expectedCloseDate: z.string().trim().max(40).optional().nullable(),
+  currency: z.string().trim().max(8).optional(),
+  assignedUser: shortText.optional(),
+  notes: longText.optional(),
+  approvalStatus: salesApprovalSchema.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesMoveDealBodySchema = z.object({
+  stage: salesStageSchema,
+});
+
+const salesLineSchema = z.object({
+  productId: idSchema.optional().nullable(),
+  name: shortText.optional(),
+  quantity: z.number().min(0).max(1_000_000).optional(),
+  unitPrice: z.number().min(0).max(1_000_000_000).optional(),
+  notes: mediumText.optional(),
+});
+
+export const salesQuotationBodySchema = z.object({
+  dealId: idSchema.optional().nullable(),
+  companyId: idSchema.optional().nullable(),
+  prospectId: idSchema.optional().nullable(),
+  customerName: shortText,
+  title: shortText,
+  status: z.enum(['draft', 'sent_manual', 'accepted', 'rejected', 'archived']).optional(),
+  approvalStatus: salesApprovalSchema.optional(),
+  currency: z.string().trim().max(8).optional(),
+  discountPercent: z.number().min(0).max(100).optional(),
+  discountSuggestion: z.number().min(0).max(100).optional(),
+  taxPercent: z.number().min(0).max(100).optional(),
+  subtotal: z.number().min(0).optional(),
+  taxAmount: z.number().min(0).optional(),
+  total: z.number().min(0).optional(),
+  terms: longText.optional(),
+  validityDays: z.number().int().min(1).max(365).optional(),
+  notes: longText.optional(),
+  lines: z.array(salesLineSchema).max(100).optional(),
+  body: longText.optional(),
+  sourcePrompt: longText.optional(),
+  conversationId: idSchema.optional().nullable(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesDocumentBodySchema = z.object({
+  dealId: idSchema.optional().nullable(),
+  quotationId: idSchema.optional().nullable(),
+  documentType: salesDocumentTypeSchema,
+  title: shortText,
+  body: longText.optional(),
+  approvalStatus: salesApprovalSchema.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const salesGenerateBodySchema = z.object({
+  instruction: longText.min(1),
+  title: shortText.optional(),
+  documentType: salesDocumentTypeSchema.optional(),
+  customerName: shortText.optional(),
+  dealTitle: shortText.optional(),
+  context: mediumText.optional(),
+  dealId: idSchema.optional().nullable(),
+  quotationId: idSchema.optional().nullable(),
+  promptId: idSchema.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const salesGenerateQuotationBodySchema = z.object({
+  instruction: longText.optional(),
+  customerName: shortText.optional(),
+  title: shortText.optional(),
+  dealId: idSchema.optional().nullable(),
+  companyId: idSchema.optional().nullable(),
+  prospectId: idSchema.optional().nullable(),
+  currency: z.string().trim().max(8).optional(),
+  discountPercent: z.number().min(0).max(100).optional(),
+  discountSuggestion: z.number().min(0).max(100).optional(),
+  taxPercent: z.number().min(0).max(100).optional(),
+  terms: longText.optional(),
+  validityDays: z.number().int().min(1).max(365).optional(),
+  notes: longText.optional(),
+  lines: z.array(salesLineSchema).max(100).optional(),
+  promptId: idSchema.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const salesExportQuerySchema = z.object({
+  format: z.enum(['markdown', 'html', 'pdf', 'docx']).default('markdown'),
+});

@@ -86,12 +86,15 @@ The prototype enforces governance expectations from the H-Kids brief:
 
 ## Environment Variables
 
-### API
+### API (`apps/api/.env`)
+
+Copy `apps/api/.env.example` to `apps/api/.env`.
 
 - `PORT`
 - `CLIENT_URL`
-- `DATABASE_URL`
+- `DATABASE_URL` **or** `DB_HOST` + `DB_PORT` + `DB_USER` + `DB_PASSWORD` + `DB_NAME`
 - `DB_SSL`
+- `JWT_SECRET`
 - `ANTHROPIC_API_KEY`
 - `DEFAULT_PROVIDER`
 - `DEFAULT_MODEL`
@@ -113,8 +116,13 @@ The prototype enforces governance expectations from the H-Kids brief:
 
 ```bash
 npm install
+cp apps/api/.env.example apps/api/.env
+# Edit DATABASE_URL / DB_* and ANTHROPIC_API_KEY
+npm run db:ensure   # creates DB + applies migrations 001–011 (requires Postgres)
 npm run dev
 ```
+
+If Postgres is not available yet, omit `DATABASE_URL` / `DB_*` and the API falls back to in-memory PostgreSQL for local UI work. Automated tests always use in-memory isolation unless `FORCE_REAL_DATABASE=true`.
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3001`
@@ -122,10 +130,14 @@ npm run dev
 ## Validation
 
 ```bash
-npm test
+npm install
 npm run lint
+npm test
 npm run build
+npm run test:e2e
 ```
+
+Every gate must pass. API tests preload `apps/api/scripts/preload-test-env.js` so developer `.env` database settings and admin passwords cannot break the suite.
 
 ## Operations and Delivery
 

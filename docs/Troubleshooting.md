@@ -5,8 +5,21 @@
 | Symptom | Check |
 |---------|-------|
 | Crash on boot in production | `JWT_SECRET`, `DATABASE_URL`, non-localhost `CLIENT_URL`, non-default `DEFAULT_ADMIN_PASSWORD` (`assertProductionConfig`) |
-| DB connection errors | `DATABASE_URL`, Postgres up, network, `DB_SSL` |
+| `database "hkids_admin_ai" does not exist` | Run `npm run db:ensure` (creates DB + migrations). Or start Compose DB: `docker compose up db -d`. |
+| `psql` / `docker` not found | Not required for ensure/migrate — Node `pg` is used. Install Docker Desktop or PostgreSQL only if you want a persistent server. |
+| DB connection refused | Postgres not running; unset `DATABASE_URL`/`DB_*` for in-memory dev, or start Postgres first |
 | Migration errors | Inspect SQL in `apps/api/src/database/migrations/`; table `schema_migrations` for applied versions |
+
+## Tests fail with database errors
+
+API tests force an isolated in-memory database via `apps/api/scripts/preload-test-env.js` (`HKIDS_USE_IN_MEMORY_DB=true`) and pin default admin credentials (`admin@hkids.app` / `Admin123!`). They must not depend on your personal `.env` passwords or database.
+
+```bash
+npm test
+# Optional real-DB suite:
+FORCE_REAL_DATABASE=true npm run db:ensure -w @hkids/api
+FORCE_REAL_DATABASE=true npm run test -w @hkids/api
+```
 
 ## Health and readiness
 
