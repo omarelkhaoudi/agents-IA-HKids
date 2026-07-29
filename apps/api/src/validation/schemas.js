@@ -229,7 +229,7 @@ export const knowledgeCompareQuerySchema = z.object({
 export const promptBodySchema = z.object({
   promptGroupId: shortText,
   version: z.number().int().min(1).max(9999),
-  status: z.enum(['active', 'draft', 'archived']),
+  status: z.enum(['draft', 'review', 'approved', 'active', 'archived', 'deprecated']).optional(),
   name: shortText,
   description: mediumText.optional(),
   role: mediumText,
@@ -239,6 +239,72 @@ export const promptBodySchema = z.object({
   constraints: z.array(mediumText).max(50),
   validationChecklist: z.array(mediumText).max(50),
   outputStyle: mediumText,
+  libraryId: idSchema.nullable().optional(),
+  category: z.string().trim().max(255).optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+  language: z.string().trim().max(20).optional(),
+  owner: z.string().trim().max(255).optional(),
+  author: z.string().trim().max(255).optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  agentCode: z.string().trim().max(120).optional(),
+  targetModel: z.string().trim().max(120).optional(),
+  temperature: z.number().min(0).max(2).nullable().optional(),
+  maxTokens: z.number().int().min(1).max(200000).nullable().optional(),
+  knowledgeCollectionIds: z.array(idSchema).max(50).optional(),
+  notes: mediumText.optional(),
+});
+
+export const promptLibraryBodySchema = z.object({
+  name: shortText,
+  description: mediumText.optional(),
+  owner: z.string().trim().max(255).optional(),
+  status: z.enum(['active', 'archived', 'draft']).optional(),
+  language: z.string().trim().max(20).optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  version: z.number().int().min(1).max(9999).optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+});
+
+export const promptReviewBodySchema = z.object({
+  comment: mediumText.optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const promptLinkBodySchema = z.object({
+  linkedType: z.enum(['document', 'collection', 'template', 'workflow', 'agent', 'analytics']),
+  linkedId: idSchema,
+  label: z.string().trim().max(255).optional(),
+});
+
+export const promptLinkParamsSchema = z.object({
+  id: idSchema,
+  linkId: idSchema,
+});
+
+export const promptVersionParamsSchema = z.object({
+  id: idSchema,
+  version: z.coerce.number().int().min(1).max(99999),
+});
+
+export const promptCompareQuerySchema = z.object({
+  left: z.coerce.number().int().min(1),
+  right: z.coerce.number().int().min(1),
+});
+
+export const promptPlaygroundBodySchema = z.object({
+  variables: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  userMessage: mediumText.optional(),
+  question: mediumText.optional(),
+  includeKnowledge: z.boolean().optional(),
+  documentIds: z.array(idSchema).max(50).optional(),
+  dryRun: z.boolean().optional(),
+  recordUsage: z.boolean().optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const promptFeedbackSuggestionBodySchema = z.object({
+  suggestion: mediumText,
+  actor: z.string().trim().max(255).optional(),
 });
 
 export const retrievalSearchBodySchema = z.object({

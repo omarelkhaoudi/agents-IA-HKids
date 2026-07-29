@@ -5,6 +5,7 @@ import Panel from '../ui/Panel';
 
 interface PromptEditorFormProps {
   prompt: PromptDefinition | null;
+  libraries?: Array<{ id: string; name: string }>;
   onSave: (payload: PromptPayload) => Promise<void>;
 }
 
@@ -21,9 +22,21 @@ interface FormState {
   constraints: string;
   validationChecklist: string;
   outputStyle: string;
+  libraryId: string;
+  category: string;
+  tags: string;
+  language: string;
+  owner: string;
+  author: string;
+  priority: string;
+  agentCode: string;
+  targetModel: string;
+  temperature: string;
+  maxTokens: string;
+  notes: string;
 }
 
-export default function PromptEditorForm({ prompt, onSave }: PromptEditorFormProps) {
+export default function PromptEditorForm({ prompt, libraries = [], onSave }: PromptEditorFormProps) {
   const [formState, setFormState] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -46,6 +59,18 @@ export default function PromptEditorForm({ prompt, onSave }: PromptEditorFormPro
       constraints: prompt.constraints.join('\n'),
       validationChecklist: prompt.validationChecklist.join('\n'),
       outputStyle: prompt.outputStyle,
+      libraryId: prompt.libraryId || '',
+      category: prompt.category || '',
+      tags: (prompt.tags || []).join(', '),
+      language: prompt.language || 'fr',
+      owner: prompt.owner || '',
+      author: prompt.author || '',
+      priority: String(prompt.priority ?? 2),
+      agentCode: prompt.agentCode || '',
+      targetModel: prompt.targetModel || '',
+      temperature: prompt.temperature == null ? '' : String(prompt.temperature),
+      maxTokens: prompt.maxTokens == null ? '' : String(prompt.maxTokens),
+      notes: prompt.notes || '',
     });
   }, [prompt]);
 
@@ -89,6 +114,21 @@ export default function PromptEditorForm({ prompt, onSave }: PromptEditorFormPro
         constraints: splitLines(formState.constraints),
         validationChecklist: splitLines(formState.validationChecklist),
         outputStyle: formState.outputStyle,
+        libraryId: formState.libraryId || null,
+        category: formState.category,
+        tags: formState.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        language: formState.language,
+        owner: formState.owner,
+        author: formState.author,
+        priority: Number(formState.priority) || 2,
+        agentCode: formState.agentCode,
+        targetModel: formState.targetModel,
+        temperature: formState.temperature === '' ? null : Number(formState.temperature),
+        maxTokens: formState.maxTokens === '' ? null : Number(formState.maxTokens),
+        notes: formState.notes,
       });
     } finally {
       setSaving(false);
@@ -120,10 +160,123 @@ export default function PromptEditorForm({ prompt, onSave }: PromptEditorFormPro
             onChange={(event) => handleChange('status', event)}
             className={inputClassName}
           >
-            <option value="active">Active</option>
             <option value="draft">Draft</option>
+            <option value="review">Review</option>
+            <option value="approved">Approved</option>
+            <option value="active">Published</option>
             <option value="archived">Archived</option>
+            <option value="deprecated">Deprecated</option>
           </select>
+        </Field>
+
+        <Field label="Library">
+          <select
+            value={formState.libraryId}
+            onChange={(event) => handleChange('libraryId', event)}
+            className={inputClassName}
+          >
+            <option value="">Unassigned</option>
+            {libraries.map((library) => (
+              <option key={library.id} value={library.id}>
+                {library.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Category">
+          <input
+            value={formState.category}
+            onChange={(event) => handleChange('category', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Agent code">
+          <input
+            value={formState.agentCode}
+            onChange={(event) => handleChange('agentCode', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Language">
+          <select
+            value={formState.language}
+            onChange={(event) => handleChange('language', event)}
+            className={inputClassName}
+          >
+            <option value="fr">French</option>
+            <option value="en">English</option>
+            <option value="ar">Arabic</option>
+          </select>
+        </Field>
+
+        <Field label="Owner">
+          <input
+            value={formState.owner}
+            onChange={(event) => handleChange('owner', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Author">
+          <input
+            value={formState.author}
+            onChange={(event) => handleChange('author', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Target model">
+          <input
+            value={formState.targetModel}
+            onChange={(event) => handleChange('targetModel', event)}
+            placeholder="claude-3-5-sonnet-latest"
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Temperature">
+          <input
+            value={formState.temperature}
+            onChange={(event) => handleChange('temperature', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Max tokens">
+          <input
+            value={formState.maxTokens}
+            onChange={(event) => handleChange('maxTokens', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Tags">
+          <input
+            value={formState.tags}
+            onChange={(event) => handleChange('tags', event)}
+            placeholder="sales, review, draft"
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Priority">
+          <input
+            value={formState.priority}
+            onChange={(event) => handleChange('priority', event)}
+            className={inputClassName}
+          />
+        </Field>
+
+        <Field label="Notes" className="md:col-span-2">
+          <textarea
+            value={formState.notes}
+            onChange={(event) => handleChange('notes', event)}
+            rows={3}
+            className={inputClassName}
+          />
         </Field>
 
         <Field label="Description" className="md:col-span-2">

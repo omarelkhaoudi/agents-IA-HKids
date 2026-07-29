@@ -4,6 +4,7 @@ import { defaultPromptDefinitions } from '../../data/default-prompt-definitions.
 import { KnowledgeDocumentRepository } from '../../repositories/KnowledgeDocumentRepository.js';
 import { PromptDefinitionRepository } from '../../repositories/PromptDefinitionRepository.js';
 import { KnowledgePlatformService } from '../knowledge/KnowledgePlatformService.js';
+import { PromptPlatformService } from '../prompt/PromptPlatformService.js';
 
 function getDisplayDate() {
   return new Intl.DateTimeFormat('en-GB', {
@@ -34,6 +35,10 @@ export class ContentCatalogService {
       documentRepository: this.documentRepository,
       refreshCaches: () => this.refreshCaches(),
     });
+    this.promptPlatform = new PromptPlatformService(pool, {
+      promptRepository: this.promptRepository,
+      refreshCaches: () => this.refreshCaches(),
+    });
     this.documentsCache = [];
     this.promptsCache = [];
     this.sourcesCache = [];
@@ -42,6 +47,7 @@ export class ContentCatalogService {
   async initialize() {
     await this.seedIfEmpty();
     await this.knowledgePlatform.seedCollectionsIfEmpty();
+    await this.promptPlatform.seedLibrariesIfEmpty();
     await this.refreshCaches();
   }
 
@@ -124,40 +130,19 @@ export class ContentCatalogService {
   }
 
   async createPrompt(payload) {
-    const prompt = await this.promptRepository.create({
-      id: `prompt-${Date.now()}`,
+    return this.promptPlatform.createPrompt({
       ...payload,
       updatedDate: getDisplayDate(),
     });
-
-    await this.refreshCaches();
-    return prompt;
   }
 
   async updatePrompt(promptId, payload) {
-    const existing = await this.promptRepository.getById(promptId);
-
-    if (!existing) {
-      return null;
-    }
-
-    const updatedPrompt = await this.promptRepository.update(promptId, {
-      ...existing,
-      ...payload,
-      updatedDate: getDisplayDate(),
+    return this.promptPlatform.updatePrompt(promptId, payload, '', {
+      changeSummary: 'Prompt saved from Prompt Builder',
     });
-
-    await this.refreshCaches();
-    return updatedPrompt;
   }
 
   async removePrompt(promptId) {
-    const deleted = await this.promptRepository.remove(promptId);
-
-    if (deleted) {
-      await this.refreshCaches();
-    }
-
-    return deleted;
+    return this.promptPlatform.removePrompt(promptId);
   }
 }
