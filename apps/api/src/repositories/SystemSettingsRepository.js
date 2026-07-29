@@ -4,7 +4,8 @@ const defaultSettings = {
   enable_streaming: 'false',
   max_retries: '2',
   request_timeout_ms: '30000',
-  default_language: 'English',
+  default_language: 'French',
+  timezone: 'Africa/Casablanca',
   company_name: 'H-Kids',
   company_address: '14 Avenue des Orangers, Casablanca, Morocco',
   company_phone: '+212 5 22 00 00 00',
@@ -13,6 +14,7 @@ const defaultSettings = {
   legal_information: 'H-Kids SARL',
   vat_number: 'VAT-HKIDS-001',
   currency: 'MAD',
+  setup_completed: 'false',
 };
 
 export class SystemSettingsRepository {

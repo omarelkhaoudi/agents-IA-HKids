@@ -3,6 +3,8 @@ import Panel from '../../components/ui/Panel';
 
 const adminNav = [
   { to: '/administration/dashboard', label: 'Dashboard' },
+  { to: '/administration/system-status', label: 'System status' },
+  { to: '/administration/exports', label: 'Exports' },
   { to: '/administration/agents', label: 'Gestion des Agents' },
   { to: '/administration/settings', label: 'Paramètres' },
   { to: '/administration/statistics', label: 'Statistiques' },

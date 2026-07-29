@@ -17,6 +17,7 @@ import generatedDocumentsRouter from './routes/generated-documents.routes.js';
 import healthRouter from './routes/health.routes.js';
 import promptsRouter from './routes/prompts.routes.js';
 import retrievalRouter from './routes/retrieval.routes.js';
+import setupRouter from './routes/setup.routes.js';
 import workflowRouter from './routes/workflow.routes.js';
 
 const protectedMiddleware = [authenticate, authorizeAccess];
@@ -44,6 +45,7 @@ export function createApp() {
 
   app.use('/api', apiRateLimiter);
   app.use('/api', healthRouter);
+  app.use('/api', setupRouter);
   app.use('/api', authRouter);
   app.use('/api', protectedMiddleware, adminRouter);
   app.use('/api', protectedMiddleware, aiRouter);

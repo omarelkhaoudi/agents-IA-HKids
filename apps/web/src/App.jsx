@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppShell from './layouts/AppShell';
@@ -6,20 +7,61 @@ import AiAdministrationPage from './pages/AiAdministrationPage';
 import AdministrationLayout from './pages/administration/AdministrationLayout';
 import AdminAgentsPage from './pages/administration/AdminAgentsPage';
 import AdminDashboardPage from './pages/administration/AdminDashboardPage';
+import AdminExportsPage from './pages/administration/AdminExportsPage';
 import AdminSettingsPage from './pages/administration/AdminSettingsPage';
 import AdminStatisticsPage from './pages/administration/AdminStatisticsPage';
+import AdminSystemStatusPage from './pages/administration/AdminSystemStatusPage';
 import DashboardPage from './pages/DashboardPage';
 import FeedbackDashboardPage from './pages/FeedbackDashboardPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import LoginPage from './pages/LoginPage';
 import PromptBuilderPage from './pages/PromptBuilderPage';
+import SetupWizardPage from './pages/SetupWizardPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
+import { getSetupStatus } from './api/setup';
 
 export default function App() {
+  const [setupLoading, setSetupLoading] = useState(true);
+  const [requiresSetup, setRequiresSetup] = useState(false);
+
+  useEffect(() => {
+    async function loadSetup() {
+      try {
+        const status = await getSetupStatus();
+        setRequiresSetup(Boolean(status.requiresSetup));
+      } catch {
+        setRequiresSetup(false);
+      } finally {
+        setSetupLoading(false);
+      }
+    }
+
+    void loadSetup();
+  }, []);
+
+  if (setupLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+        Loading platform...
+      </div>
+    );
+  }
+
+  if (requiresSetup) {
+    return (
+      <SetupWizardPage
+        onCompleted={() => {
+          setRequiresSetup(false);
+        }}
+      />
+    );
+  }
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/setup" element={<SetupWizardPage onCompleted={() => setRequiresSetup(false)} />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -33,6 +75,8 @@ export default function App() {
             <Route path="/administration" element={<AdministrationLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="system-status" element={<AdminSystemStatusPage />} />
+              <Route path="exports" element={<AdminExportsPage />} />
               <Route path="agents" element={<AdminAgentsPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
               <Route path="statistics" element={<AdminStatisticsPage />} />

@@ -181,3 +181,27 @@ export const updateAgentBodySchema = createAgentBodySchema.partial();
 export const updateSettingsBodySchema = z.object({
   settings: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
 }).or(z.record(z.union([z.string(), z.number(), z.boolean()])));
+
+export const setupBodySchema = z.object({
+  companyName: shortText,
+  companyAddress: mediumText.optional(),
+  companyEmail: z.union([z.literal(''), z.string().trim().email().max(255)]).optional(),
+  companyPhone: z.string().trim().max(50).optional(),
+  administratorName: shortText,
+  administratorEmail: z.string().trim().email().max(255),
+  administratorPassword: z.string().min(8).max(128),
+  anthropicApiKey: z.string().trim().max(500).optional(),
+  defaultProvider: shortText.default('anthropic'),
+  defaultModel: shortText.default('claude-3-5-sonnet-latest'),
+  language: shortText.default('French'),
+  timezone: shortText.default('Africa/Casablanca'),
+  currency: z.string().trim().min(1).max(10).default('MAD'),
+});
+
+export const exportTypeParamsSchema = z.object({
+  type: z.enum(['ai-usage', 'feedback', 'statistics', 'generated-documents']),
+});
+
+export const exportQuerySchema = z.object({
+  format: z.enum(['json', 'csv']).default('json'),
+});

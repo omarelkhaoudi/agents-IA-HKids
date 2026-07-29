@@ -61,3 +61,54 @@ export interface AdminDashboardData {
 }
 
 export type AdminSettings = Record<string, string>;
+
+export interface SystemStatus {
+  system: {
+    status: string;
+    version: string;
+    uptimeSeconds: number;
+    nodeEnv: string;
+  };
+  database: {
+    status: string;
+    latencyMs?: number;
+    message?: string;
+  };
+  claudeApi: {
+    status: string;
+    configured: boolean;
+    provider: string;
+    model: string;
+  };
+  storage: {
+    knowledgeDocuments: number;
+    generatedDocuments: number;
+    prompts: number;
+    approximateBytes: number;
+    approximateMegabytes: number;
+    note: string;
+  };
+  aiUsage: {
+    totalRequests: number;
+    totalCost: number;
+    totalTokens: number;
+    averageResponseMs: number;
+  };
+  currentModel: string;
+  currentProvider: string;
+  version: string;
+  migrationVersion: string;
+  environment: {
+    valid: boolean;
+    issues: string[];
+    nodeEnv: string;
+    defaultProvider: string;
+    defaultModel: string;
+    clientUrl: string;
+    databaseConfigured: boolean;
+    anthropicConfigured: boolean;
+  };
+  pendingWorkflows: number;
+  pendingApprovals: number;
+  pendingFeedback: number;
+}

@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 export function errorHandler(error, request, response, next) {
   if (response.headersSent) {
@@ -13,12 +14,18 @@ export function errorHandler(error, request, response, next) {
       ? 'An unexpected error occurred.'
       : error.message || 'An unexpected error occurred.';
 
-  if (isServerError) {
-    console.error(`[error] ${request.method} ${request.originalUrl}`, error);
-  }
+  logger.error('http_error', {
+    requestId: request.requestId,
+    method: request.method,
+    path: request.originalUrl,
+    statusCode,
+    message: error.message,
+    stack: env.nodeEnv === 'production' ? undefined : error.stack,
+  });
 
   response.status(statusCode).json({
     message,
+    requestId: request.requestId,
     ...(env.nodeEnv !== 'production' && error.stack ? { stack: error.stack } : {}),
   });
 }
@@ -26,5 +33,6 @@ export function errorHandler(error, request, response, next) {
 export function notFoundHandler(request, response) {
   response.status(404).json({
     message: `Route not found: ${request.method} ${request.originalUrl}`,
+    requestId: request.requestId,
   });
 }

@@ -1,10 +1,31 @@
+import { access } from 'node:fs/promises';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const migrationsDirectory = path.join(__dirname, 'migrations');
+
+async function resolveMigrationsDirectory() {
+  const candidates = [
+    path.join(__dirname, 'migrations'),
+    path.join(__dirname, 'database', 'migrations'),
+    path.join(__dirname, '..', 'src', 'database', 'migrations'),
+    path.join(process.cwd(), 'src', 'database', 'migrations'),
+    path.join(process.cwd(), 'apps', 'api', 'src', 'database', 'migrations'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+
+  return path.join(__dirname, 'migrations');
+}
 
 export async function runMigrations(pool) {
   await pool.query(`
@@ -14,6 +35,7 @@ export async function runMigrations(pool) {
     )
   `);
 
+  const migrationsDirectory = await resolveMigrationsDirectory();
   const migrationFiles = (await readdir(migrationsDirectory))
     .filter((fileName) => fileName.endsWith('.sql'))
     .sort();

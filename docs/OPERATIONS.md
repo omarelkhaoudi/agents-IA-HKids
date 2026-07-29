@@ -1,52 +1,44 @@
 # Operations Guide
 
-## H-Kids Ownership Checklist
+Short index for day-2 operations. Detailed procedures live in the docs below.
+
+## Documentation map
+
+| Topic | Document |
+|-------|----------|
+| System design | [Architecture.md](./Architecture.md) |
+| Install, Docker, env, Claude | [Deployment.md](./Deployment.md) |
+| Admin console, exports, status | [Administration.md](./Administration.md) |
+| Backup and restore scripts | [Backup-Restore.md](./Backup-Restore.md) |
+| New agents | [Creating-New-Agent.md](./Creating-New-Agent.md) |
+| Prompts | [Prompt-System.md](./Prompt-System.md) |
+| Knowledge + RAG | [Knowledge-Base.md](./Knowledge-Base.md) |
+| Approval and export | [Workflow.md](./Workflow.md) |
+| HTTP API + RBAC | [API.md](./API.md) |
+| Common failures | [Troubleshooting.md](./Troubleshooting.md) |
+| Auth, secrets, hardening | [Security.md](./Security.md) |
+| Handover checklist | [DELIVERY_CHECKLIST.md](./DELIVERY_CHECKLIST.md) |
+
+## Quick ownership checklist
+
 - Anthropic account and API key
-- hosting project
-- PostgreSQL database
-- storage bucket or document storage
-- source repository
-- administrator email inboxes
-- monitoring and backup access
+- Hosting project (API, web, Postgres)
+- Source repository access
+- Administrator accounts and email inboxes
+- Monitoring on `/api/health` and `/api/ready`
+- Scheduled backups (`scripts/backup.sh` \| `backup.ps1`) and tested restore
 
-## Backup and Recovery Procedure
-1. Restore the latest PostgreSQL snapshot.
-2. Re-apply environment variables.
-3. Restore document storage.
-4. Deploy the current codebase.
-5. Run migrations on startup.
-6. Verify `agents`, `conversations`, `generated_documents`, `feedback`, `workflow_instances`, and `ai_usage`.
-7. Validate administrator access before reopening usage.
+## Governance (unchanged)
 
-## Agent Administration
-1. Open `Administration > Agents`.
-2. Create or update an agent.
-3. Adjust provider, model, temperature, tokens, timeout, and retries.
-4. Link prompts, documents, and workflows.
-5. Activate or deactivate the agent.
-6. Test the agent in the shared workspace.
+- Every output starts as a draft
+- No automatic publication, sending, commercial commitment, or sensitive HR decision
+- Export only after human approval
 
-## Add or Modify an Agent
-1. Create the agent with a unique `code`.
-2. Prepare prompt versions.
-3. Attach relevant documents.
-4. Link workflows that preserve human validation.
-5. Test the draft quality and approval flow.
-6. Verify usage and cost reporting by agent.
+## Recovery (summary)
 
-## Governance Rules
-- every output starts as a draft
-- no automatic publication
-- no automatic sending of documents or emails
-- no automatic commercial commitment
-- no automatic sensitive HR decision or communication
-- export only after approval
+1. Restore latest backup ([Backup-Restore.md](./Backup-Restore.md))
+2. Re-apply environment / runtime secrets
+3. Restart API (migrations apply on startup; `schema_migrations` tracks 001–009)
+4. Verify health, admin login, agents, and Claude status
 
-## Administrator Training Checklist
-- switch between the 4 prototype agents
-- update prompts and instructions
-- attach or remove documents per agent
-- read dashboard statistics and AI usage
-- approve or reject generated documents
-- review workflow history and feedback patterns
-- handle backups and recovery access
+For agent administration, prompts, documents, and training steps, use [Administration.md](./Administration.md) and [DELIVERY_CHECKLIST.md](./DELIVERY_CHECKLIST.md).
