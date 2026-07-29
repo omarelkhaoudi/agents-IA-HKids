@@ -24,7 +24,7 @@ const agentLinks = [
     accent: 'bg-orange-400',
   },
   {
-    to: '/assistant?agent=hr-agent',
+    to: '/hr-agent',
     label: 'HR Agent',
     code: 'hr-agent',
     accent: 'bg-emerald-400',
@@ -68,6 +68,7 @@ export default function AppShell() {
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith('/community-manager')) return 'Community Manager';
     if (location.pathname.startsWith('/sales-agent')) return 'Sales Agent';
+    if (location.pathname.startsWith('/hr-agent')) return 'HR Agent';
     if (location.pathname.startsWith('/administration')) return 'Administration';
     if (location.pathname.startsWith('/assistant')) return 'AI Workspace';
     if (location.pathname.startsWith('/knowledge-base')) return 'Knowledge Base';

@@ -100,7 +100,22 @@ export async function initializeAdminRuntime() {
                 'prompt-sales-upsell-001',
                 'prompt-sales-objection-001',
               ]
-            : ['prompt-001'],
+            : blueprint.code === 'hr-agent'
+              ? [
+                  'prompt-hr-recruitment-001',
+                  'prompt-hr-interview-001',
+                  'prompt-hr-job-description-001',
+                  'prompt-hr-contract-001',
+                  'prompt-hr-warning-001',
+                  'prompt-hr-explanation-001',
+                  'prompt-hr-leave-001',
+                  'prompt-hr-performance-001',
+                  'prompt-hr-training-001',
+                  'prompt-hr-onboarding-001',
+                  'prompt-hr-offboarding-001',
+                  'prompt-hr-policy-001',
+                ]
+              : ['prompt-001'],
       documentIds: ['doc-001', 'doc-002'],
       workflowCodes: blueprint.workflowCodes,
     });

@@ -67,8 +67,9 @@ export class AgentConfigurationService {
       {
         code: 'hr-agent',
         name: 'Agent RH IA',
-        description: 'Prepares HR letters, role descriptions, follow-up sheets, and staff documents.',
-        workflowCodes: ['document-review', 'archive-flow'],
+        description:
+          'Prepares HR drafts, contracts, leave recommendations, and people workflows with mandatory manager approval.',
+        workflowCodes: ['document-review', 'export-approval', 'archive-flow'],
       },
     ];
   }

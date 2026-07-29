@@ -32,8 +32,8 @@ const agents = [
       'HR letters, job descriptions, absence follow-up, and staff documents under controlled review.',
     accent: 'emerald',
     icon: 'HR',
-    workspaceTo: '/assistant?agent=hr-agent',
-    stats: 'HR drafts',
+    workspaceTo: '/hr-agent',
+    stats: 'People ops',
   },
   {
     title: 'Community Manager',

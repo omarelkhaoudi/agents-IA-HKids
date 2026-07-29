@@ -493,3 +493,195 @@ export const salesGenerateQuotationBodySchema = z.object({
 export const salesExportQuerySchema = z.object({
   format: z.enum(['markdown', 'html', 'pdf', 'docx']).default('markdown'),
 });
+
+const hrApprovalSchema = z.enum([
+  'draft',
+  'pending_review',
+  'approved',
+  'rejected',
+  'exported',
+]);
+
+const hrDocumentTypeSchema = z.enum([
+  'job_description',
+  'employment_contract',
+  'internship_agreement',
+  'freelance_contract',
+  'probation_confirmation',
+  'contract_amendment',
+  'employment_certificate',
+  'salary_certificate',
+  'administrative_letter',
+  'warning_letter',
+  'explanation_request',
+  'meeting_invitation',
+  'disciplinary_report',
+  'administrative_notice',
+  'performance_review',
+  'training_plan',
+  'onboarding_plan',
+  'offboarding_plan',
+  'offer_letter',
+  'rejection_letter',
+  'interview_summary',
+  'recruitment_summary',
+  'hr_report',
+  'internal_communication',
+  'other',
+]);
+
+export const hrEmployeeBodySchema = z.object({
+  fullName: shortText,
+  email: z.string().trim().max(255).optional(),
+  phone: shortText.optional(),
+  department: shortText.optional(),
+  position: shortText.optional(),
+  managerName: shortText.optional(),
+  employmentType: z
+    .enum(['full_time', 'part_time', 'internship', 'freelance', 'temporary'])
+    .optional(),
+  startDate: z.string().trim().max(40).optional().nullable(),
+  status: z.enum(['active', 'onboarding', 'on_leave', 'offboarding', 'inactive']).optional(),
+  tags: z.array(z.string().max(80)).max(40).optional(),
+  notes: longText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrCandidateBodySchema = z.object({
+  fullName: shortText,
+  email: z.string().trim().max(255).optional(),
+  phone: shortText.optional(),
+  positionApplied: shortText.optional(),
+  stage: z
+    .enum([
+      'applied',
+      'screening',
+      'interview',
+      'shortlist',
+      'offer',
+      'hired',
+      'rejected',
+      'withdrawn',
+    ])
+    .optional(),
+  source: shortText.optional(),
+  evaluationScore: z.number().int().min(0).max(100).optional().nullable(),
+  shortlisted: z.boolean().optional(),
+  interviewNotes: longText.optional(),
+  tags: z.array(z.string().max(80)).max(40).optional(),
+  notes: longText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrJobDescriptionBodySchema = z.object({
+  title: shortText,
+  department: shortText.optional(),
+  location: shortText.optional(),
+  contractType: shortText.optional(),
+  mission: longText.optional(),
+  responsibilities: z.array(z.string().max(500)).max(50).optional(),
+  dailyTasks: z.array(z.string().max(500)).max(50).optional(),
+  requiredSkills: z.array(z.string().max(200)).max(50).optional(),
+  preferredSkills: z.array(z.string().max(200)).max(50).optional(),
+  experience: mediumText.optional(),
+  education: mediumText.optional(),
+  softSkills: z.array(z.string().max(200)).max(50).optional(),
+  languages: z.array(z.string().max(120)).max(30).optional(),
+  benefits: z.array(z.string().max(300)).max(40).optional(),
+  body: longText.optional(),
+  approvalStatus: hrApprovalSchema.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrLeaveBodySchema = z.object({
+  employeeId: idSchema.optional().nullable(),
+  employeeName: shortText.optional(),
+  leaveType: z
+    .enum(['annual', 'paid', 'unpaid', 'medical', 'remote', 'exceptional', 'parental'])
+    .optional(),
+  startDate: z.string().trim().max(40).optional().nullable(),
+  endDate: z.string().trim().max(40).optional().nullable(),
+  days: z.number().int().min(1).max(365).optional(),
+  reason: mediumText.optional(),
+  status: z.enum(['pending', 'approved', 'rejected', 'cancelled']).optional(),
+  aiRecommendation: longText.optional(),
+  managerDecision: mediumText.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrLeaveRecommendBodySchema = z.object({
+  employeeId: idSchema.optional().nullable(),
+  employeeName: shortText.optional(),
+  leaveType: z
+    .enum(['annual', 'paid', 'unpaid', 'medical', 'remote', 'exceptional', 'parental'])
+    .optional(),
+  startDate: z.string().trim().max(40).optional().nullable(),
+  endDate: z.string().trim().max(40).optional().nullable(),
+  days: z.number().int().min(1).max(365).optional(),
+  reason: mediumText.optional(),
+  instruction: longText.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const hrDecideLeaveBodySchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+});
+
+export const hrAbsenceBodySchema = z.object({
+  employeeId: idSchema.optional().nullable(),
+  employeeName: shortText.optional(),
+  reason: mediumText.optional(),
+  startDate: z.string().trim().max(40).optional().nullable(),
+  endDate: z.string().trim().max(40).optional().nullable(),
+  durationDays: z.number().int().min(1).max(365).optional(),
+  supportingDocs: z.array(z.string().max(300)).max(40).optional(),
+  status: z.enum(['recorded', 'under_review', 'closed']).optional(),
+  alertFlag: z.boolean().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrDocumentBodySchema = z.object({
+  employeeId: idSchema.optional().nullable(),
+  candidateId: idSchema.optional().nullable(),
+  documentType: hrDocumentTypeSchema,
+  title: shortText,
+  body: longText.optional(),
+  approvalStatus: hrApprovalSchema.optional(),
+  version: z.number().int().min(1).max(1000).optional(),
+  sourcePrompt: longText.optional(),
+  conversationId: idSchema.optional().nullable(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const hrGenerateBodySchema = z.object({
+  instruction: longText.min(1),
+  title: shortText.optional(),
+  documentType: hrDocumentTypeSchema.optional(),
+  employeeId: idSchema.optional().nullable(),
+  candidateId: idSchema.optional().nullable(),
+  employeeName: shortText.optional(),
+  candidateName: shortText.optional(),
+  department: shortText.optional(),
+  promptId: idSchema.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const hrGenerateJobBodySchema = z.object({
+  instruction: longText.optional(),
+  title: shortText.optional(),
+  department: shortText.optional(),
+  location: shortText.optional(),
+  contractType: shortText.optional(),
+  promptId: idSchema.optional(),
+  provider: shortText.optional(),
+  model: shortText.optional(),
+  conversationId: idSchema.optional().nullable(),
+});
+
+export const hrExportQuerySchema = z.object({
+  format: z.enum(['markdown', 'html', 'csv']).default('markdown'),
+});

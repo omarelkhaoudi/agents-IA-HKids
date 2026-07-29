@@ -11,6 +11,7 @@ const ASSISTANT_PREFIX = '/assistant';
 const RETRIEVAL_PREFIX = '/retrieval';
 const COMMUNITY_MANAGER_PREFIX = '/community-manager';
 const SALES_AGENT_PREFIX = '/sales-agent';
+const HR_AGENT_PREFIX = '/hr-agent';
 
 function getPath(request) {
   const fullPath = request.originalUrl || request.url || request.path || '';
@@ -154,6 +155,27 @@ export function authorizeAccess(request, response, next) {
     if (
       writeRequest &&
       (path.includes('/approve') || path.includes('/reject')) &&
+      !hasMinimumRole(role, ROLES.MANAGER)
+    ) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  if (path.startsWith(HR_AGENT_PREFIX)) {
+    if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    if (
+      writeRequest &&
+      (path.includes('/approve') ||
+        path.includes('/reject') ||
+        path.includes('/decide')) &&
       !hasMinimumRole(role, ROLES.MANAGER)
     ) {
       deny(response);
