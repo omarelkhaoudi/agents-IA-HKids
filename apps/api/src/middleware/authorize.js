@@ -5,6 +5,7 @@ const AI_PREFIX = '/ai';
 const FEEDBACK_PREFIX = '/feedback';
 const WORKFLOW_SUFFIX = '/workflow';
 const DOCUMENTS_PREFIX = '/documents';
+const KNOWLEDGE_PREFIX = '/knowledge';
 const PROMPTS_PREFIX = '/prompts';
 const CONVERSATIONS_PREFIX = '/conversations';
 const ASSISTANT_PREFIX = '/assistant';
@@ -86,6 +87,30 @@ export function authorizeAccess(request, response, next) {
 
   if (path.startsWith(DOCUMENTS_PREFIX)) {
     if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  if (path.startsWith(KNOWLEDGE_PREFIX)) {
+    if (writeRequest && !hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    if (
+      writeRequest &&
+      (path.includes('/publish') ||
+        path.includes('/archive') ||
+        path.includes('/bulk') ||
+        path.includes('/import') ||
+        path.includes('/tags/merge') ||
+        path.includes('/collections')) &&
+      !hasMinimumRole(role, ROLES.MANAGER)
+    ) {
       deny(response);
       return;
     }

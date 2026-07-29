@@ -3,17 +3,19 @@ import type {
   KnowledgeBaseDocument,
   KnowledgeBaseDocumentPayload,
   KnowledgeBaseStatus,
+  KnowledgeCollection,
   SupportedDocumentType,
 } from '../../types/knowledge-base';
 import Button from '../ui/Button';
 
-const supportedTypes: SupportedDocumentType[] = ['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV'];
-const statuses: KnowledgeBaseStatus[] = ['active', 'review', 'archived'];
+const supportedTypes: SupportedDocumentType[] = ['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV', 'MD', 'HTML'];
+const statuses: KnowledgeBaseStatus[] = ['draft', 'review', 'active', 'archived'];
 
 interface DocumentDialogProps {
   open: boolean;
   mode: 'create' | 'edit';
   document: KnowledgeBaseDocument | null;
+  collections?: KnowledgeCollection[];
   onClose: () => void;
   onSubmit: (payload: KnowledgeBaseDocumentPayload) => Promise<void>;
 }
@@ -25,6 +27,13 @@ interface FormState {
   tags: string;
   status: KnowledgeBaseStatus;
   author: string;
+  owner: string;
+  language: string;
+  collectionId: string;
+  priority: string;
+  reviewDate: string;
+  expirationDate: string;
+  notes: string;
   fileType: SupportedDocumentType;
   size: string;
   sourceFileName: string;
@@ -35,8 +44,15 @@ const initialState: FormState = {
   category: 'Administration',
   description: '',
   tags: '',
-  status: 'active',
+  status: 'draft',
   author: 'Operations Team',
+  owner: 'Knowledge Manager',
+  language: 'fr',
+  collectionId: '',
+  priority: '2',
+  reviewDate: '',
+  expirationDate: '',
+  notes: '',
   fileType: 'PDF',
   size: '0.0 MB',
   sourceFileName: '',
@@ -46,6 +62,7 @@ export default function DocumentDialog({
   open,
   mode,
   document,
+  collections = [],
   onClose,
   onSubmit,
 }: DocumentDialogProps) {
@@ -58,7 +75,10 @@ export default function DocumentDialog({
     }
 
     if (!document || mode === 'create') {
-      setFormState(initialState);
+      setFormState({
+        ...initialState,
+        collectionId: collections[0]?.id || '',
+      });
       return;
     }
 
@@ -67,13 +87,20 @@ export default function DocumentDialog({
       category: document.category,
       description: document.description,
       tags: document.tags.join(', '),
-      status: document.status,
+      status: document.status === 'deleted' ? 'archived' : document.status,
       author: document.author,
+      owner: document.owner || document.author,
+      language: document.language || 'fr',
+      collectionId: document.collectionId || '',
+      priority: String(document.priority ?? 2),
+      reviewDate: document.reviewDate || '',
+      expirationDate: document.expirationDate || '',
+      notes: document.notes || '',
       fileType: document.fileType,
       size: document.size,
       sourceFileName: document.sourceFileName,
     });
-  }, [document, mode, open]);
+  }, [collections, document, mode, open]);
 
   const title = useMemo(
     () => (mode === 'create' ? 'Upload document' : 'Edit document metadata'),
@@ -109,7 +136,9 @@ export default function DocumentDialog({
       title: currentState.title || file.name.replace(/\.[^.]+$/, ''),
       sourceFileName: file.name,
       size: sizeInMb,
-      fileType: supportedTypes.includes(extension || 'PDF') ? (extension as SupportedDocumentType) : 'PDF',
+      fileType: supportedTypes.includes(extension || 'PDF')
+        ? (extension as SupportedDocumentType)
+        : 'PDF',
     }));
   };
 
@@ -128,6 +157,13 @@ export default function DocumentDialog({
           .filter(Boolean),
         status: formState.status,
         author: formState.author,
+        owner: formState.owner,
+        language: formState.language,
+        collectionId: formState.collectionId || null,
+        priority: Number(formState.priority) || 2,
+        reviewDate: formState.reviewDate,
+        expirationDate: formState.expirationDate,
+        notes: formState.notes,
         fileType: formState.fileType,
         size: formState.size,
         sourceFileName: formState.sourceFileName,
@@ -142,12 +178,12 @@ export default function DocumentDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-3xl rounded-[2rem] border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-slate-950/50"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-slate-950/50"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
-              Knowledge Base
+              Knowledge Platform
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">{title}</h2>
           </div>
@@ -161,7 +197,7 @@ export default function DocumentDialog({
             <span className="mb-2 block text-sm font-medium text-slate-200">Document file</span>
             <input
               type="file"
-              accept=".pdf,.docx,.xlsx,.txt,.csv"
+              accept=".pdf,.docx,.xlsx,.txt,.csv,.md,.html"
               onChange={handleFileChange}
               className="w-full rounded-2xl border border-dashed border-white/15 bg-slate-950/70 px-4 py-4 text-sm text-slate-300"
             />
@@ -185,12 +221,47 @@ export default function DocumentDialog({
             />
           </Field>
 
+          <Field label="Collection">
+            <select
+              value={formState.collectionId}
+              onChange={(event) => handleChange('collectionId', event)}
+              className={inputClassName}
+            >
+              <option value="">Unassigned</option>
+              {collections.map((collection) => (
+                <option key={collection.id} value={collection.id}>
+                  {collection.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Language">
+            <select
+              value={formState.language}
+              onChange={(event) => handleChange('language', event)}
+              className={inputClassName}
+            >
+              <option value="fr">French</option>
+              <option value="en">English</option>
+              <option value="ar">Arabic</option>
+            </select>
+          </Field>
+
           <Field label="Author">
             <input
               value={formState.author}
               onChange={(event) => handleChange('author', event)}
               className={inputClassName}
               required
+            />
+          </Field>
+
+          <Field label="Owner">
+            <input
+              value={formState.owner}
+              onChange={(event) => handleChange('owner', event)}
+              className={inputClassName}
             />
           </Field>
 
@@ -202,10 +273,21 @@ export default function DocumentDialog({
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {status === 'active' ? 'published' : status}
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Priority">
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={formState.priority}
+              onChange={(event) => handleChange('priority', event)}
+              className={inputClassName}
+            />
           </Field>
 
           <Field label="File type">
@@ -231,6 +313,24 @@ export default function DocumentDialog({
             />
           </Field>
 
+          <Field label="Review date">
+            <input
+              value={formState.reviewDate}
+              onChange={(event) => handleChange('reviewDate', event)}
+              placeholder="e.g. 01 Aug 2026"
+              className={inputClassName}
+            />
+          </Field>
+
+          <Field label="Expiration date">
+            <input
+              value={formState.expirationDate}
+              onChange={(event) => handleChange('expirationDate', event)}
+              placeholder="e.g. 01 Aug 2027"
+              className={inputClassName}
+            />
+          </Field>
+
           <label className="block md:col-span-2">
             <span className="mb-2 block text-sm font-medium text-slate-200">Description</span>
             <textarea
@@ -239,6 +339,16 @@ export default function DocumentDialog({
               rows={4}
               className={inputClassName}
               required
+            />
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="mb-2 block text-sm font-medium text-slate-200">Notes</span>
+            <textarea
+              value={formState.notes}
+              onChange={(event) => handleChange('notes', event)}
+              rows={3}
+              className={inputClassName}
             />
           </label>
 

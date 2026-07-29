@@ -130,10 +130,100 @@ export const documentBodySchema = z.object({
   description: mediumText.optional(),
   tags: z.array(z.string().trim().max(80)).max(30).default([]),
   size: z.string().trim().max(50).optional(),
-  status: z.enum(['active', 'review', 'archived']).optional(),
+  status: z.enum(['draft', 'active', 'review', 'archived', 'deleted']).optional(),
   author: z.string().trim().max(255).optional(),
-  fileType: z.enum(['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV']).optional(),
+  owner: z.string().trim().max(255).optional(),
+  language: z.string().trim().max(20).optional(),
+  collectionId: idSchema.nullable().optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  reviewDate: z.string().trim().max(80).optional(),
+  expirationDate: z.string().trim().max(80).optional(),
+  notes: mediumText.optional(),
+  content: longText.optional(),
+  fileType: z.enum(['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV', 'MD', 'HTML']).optional(),
   sourceFileName: z.string().trim().max(255).optional(),
+});
+
+export const knowledgeCollectionBodySchema = z.object({
+  name: shortText,
+  description: mediumText.optional(),
+  icon: z.string().trim().max(80).optional(),
+  color: z.string().trim().max(40).optional(),
+  owner: z.string().trim().max(255).optional(),
+  status: z.enum(['active', 'archived', 'draft']).optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  language: z.string().trim().max(20).optional(),
+});
+
+export const knowledgeReviewBodySchema = z.object({
+  comment: mediumText.optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const knowledgeLinkBodySchema = z.object({
+  linkedType: z.enum(['prompt', 'workflow', 'agent', 'template', 'document']),
+  linkedId: idSchema,
+  label: z.string().trim().max(255).optional(),
+});
+
+export const knowledgeTagBodySchema = z.object({
+  name: shortText,
+  color: z.string().trim().max(40).optional(),
+  parentId: idSchema.nullable().optional(),
+  usageCount: z.number().int().min(0).optional(),
+});
+
+export const knowledgeMergeTagsBodySchema = z.object({
+  sourceName: shortText,
+  targetName: shortText,
+});
+
+export const knowledgeBulkBodySchema = z.object({
+  action: z.enum(['archive', 'delete', 'move', 'tag', 'duplicate', 'merge']),
+  documentIds: z.array(idSchema).min(1).max(200),
+  collectionId: idSchema.optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+});
+
+export const knowledgeImportBodySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: idSchema.optional(),
+        title: shortText,
+        category: shortText,
+        description: mediumText.optional(),
+        tags: z.array(z.string().trim().max(80)).max(30).optional(),
+        collectionId: idSchema.nullable().optional(),
+        owner: z.string().trim().max(255).optional(),
+        author: z.string().trim().max(255).optional(),
+        language: z.string().trim().max(20).optional(),
+        status: z.enum(['draft', 'active', 'review', 'archived']).optional(),
+        priority: z.number().int().min(0).max(10).optional(),
+        reviewDate: z.string().trim().max(80).optional(),
+        expirationDate: z.string().trim().max(80).optional(),
+        notes: mediumText.optional(),
+        fileType: z.enum(['PDF', 'DOCX', 'XLSX', 'TXT', 'CSV', 'MD', 'HTML']).optional(),
+        size: z.string().trim().max(50).optional(),
+        sourceFileName: z.string().trim().max(255).optional(),
+      })
+    )
+    .max(500),
+});
+
+export const knowledgeVersionParamsSchema = z.object({
+  id: idSchema,
+  version: z.coerce.number().int().min(1).max(99999),
+});
+
+export const knowledgeLinkParamsSchema = z.object({
+  id: idSchema,
+  linkId: idSchema,
+});
+
+export const knowledgeCompareQuerySchema = z.object({
+  left: z.coerce.number().int().min(1),
+  right: z.coerce.number().int().min(1),
 });
 
 export const promptBodySchema = z.object({

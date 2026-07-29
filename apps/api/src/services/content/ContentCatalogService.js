@@ -3,6 +3,7 @@ import { defaultKnowledgeDocuments } from '../../data/default-knowledge-document
 import { defaultPromptDefinitions } from '../../data/default-prompt-definitions.js';
 import { KnowledgeDocumentRepository } from '../../repositories/KnowledgeDocumentRepository.js';
 import { PromptDefinitionRepository } from '../../repositories/PromptDefinitionRepository.js';
+import { KnowledgePlatformService } from '../knowledge/KnowledgePlatformService.js';
 
 function getDisplayDate() {
   return new Intl.DateTimeFormat('en-GB', {
@@ -29,6 +30,10 @@ export class ContentCatalogService {
   constructor(pool) {
     this.documentRepository = new KnowledgeDocumentRepository(pool);
     this.promptRepository = new PromptDefinitionRepository(pool);
+    this.knowledgePlatform = new KnowledgePlatformService(pool, {
+      documentRepository: this.documentRepository,
+      refreshCaches: () => this.refreshCaches(),
+    });
     this.documentsCache = [];
     this.promptsCache = [];
     this.sourcesCache = [];
@@ -36,6 +41,7 @@ export class ContentCatalogService {
 
   async initialize() {
     await this.seedIfEmpty();
+    await this.knowledgePlatform.seedCollectionsIfEmpty();
     await this.refreshCaches();
   }
 
@@ -85,18 +91,14 @@ export class ContentCatalogService {
   }
 
   async createDocument(payload) {
-    const timestamp = getDisplayDate();
-    const document = await this.documentRepository.create({
-      id: `doc-${Date.now()}`,
+    return this.knowledgePlatform.createDocument({
       ...payload,
+      status: payload.status || 'active',
       content: buildDocumentContent({ ...payload, tags: payload.tags || [] }),
-      priority: payload.status === 'active' ? 2 : 1,
-      createdDate: timestamp,
-      updatedDate: timestamp,
+      priority: payload.status === 'active' || !payload.status ? 2 : 1,
+      createdDate: getDisplayDate(),
+      updatedDate: getDisplayDate(),
     });
-
-    await this.refreshCaches();
-    return document;
   }
 
   async updateDocument(documentId, payload) {
@@ -106,31 +108,19 @@ export class ContentCatalogService {
       return null;
     }
 
-    const merged = {
-      ...existing,
+    return this.knowledgePlatform.updateDocument(documentId, {
       ...payload,
-      updatedDate: getDisplayDate(),
       content: buildDocumentContent({
         ...existing,
         ...payload,
         tags: payload.tags || existing.tags,
       }),
       priority: (payload.status || existing.status) === 'active' ? 2 : 1,
-    };
-
-    const updatedDocument = await this.documentRepository.update(documentId, merged);
-    await this.refreshCaches();
-    return updatedDocument;
+    });
   }
 
   async removeDocument(documentId) {
-    const deleted = await this.documentRepository.remove(documentId);
-
-    if (deleted) {
-      await this.refreshCaches();
-    }
-
-    return deleted;
+    return this.knowledgePlatform.removeDocument(documentId);
   }
 
   async createPrompt(payload) {
