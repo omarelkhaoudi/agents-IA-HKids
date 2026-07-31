@@ -5,9 +5,11 @@ import { retrievalSearchBodySchema } from '../validation/schemas.js';
 
 const retrievalRouter = Router();
 
-retrievalRouter.post('/retrieval/search', validate({ body: retrievalSearchBodySchema }), (request, response) => {
+retrievalRouter.post('/retrieval/search', validate({ body: retrievalSearchBodySchema }), async (request, response) => {
   try {
-    const result = retrievalService.retrieveRelevantContext(request.body.question);
+    const result = retrievalService.retrieveRelevantContextAsync
+      ? await retrievalService.retrieveRelevantContextAsync(request.body.question, request.body)
+      : retrievalService.retrieveRelevantContext(request.body.question, request.body);
     response.json(result);
   } catch (error) {
     response.status(400).json({

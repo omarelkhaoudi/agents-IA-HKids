@@ -153,9 +153,15 @@ export class HrAgentService {
       payload.instruction ||
       payload.title ||
       `Prepare a ${documentType.replaceAll('_', ' ')} draft for H-Kids HR.`;
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
     const prompts = this.filterHrPrompts(this.listPrompts());
     const selectedPrompt = prompts.find((prompt) => prompt.id === payload.promptId) || prompts[0];
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'hr-agent',
+          promptId: selectedPrompt?.id || payload.promptId,
+          promptAwareText: selectedPrompt?.objective || documentType,
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
 
     const userMessage = [
       `Document type: ${documentType}`,
@@ -232,10 +238,16 @@ export class HrAgentService {
     const instruction =
       payload.instruction ||
       `Prepare a job description for ${payload.title || 'a H-Kids role'} in ${payload.department || 'operations'}.`;
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
     const prompts = this.filterHrPrompts(this.listPrompts());
     const selectedPrompt =
       prompts.find((prompt) => prompt.promptGroupId === 'hr-job-description') || prompts[0];
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'hr-agent',
+          promptId: selectedPrompt?.id || payload.promptId,
+          promptAwareText: selectedPrompt?.objective || 'job description',
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
 
     const generation = await this.aiGateway.generate({
       provider: payload.provider,
@@ -313,7 +325,12 @@ export class HrAgentService {
     const instruction =
       payload.instruction ||
       `Recommend whether leave can be considered for ${payload.employeeName || 'employee'} (${payload.leaveType || 'annual'}).`;
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'hr-agent',
+          promptAwareText: payload.leaveType || 'leave policy',
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
 
     const generation = await this.aiGateway.generate({
       provider: payload.provider,

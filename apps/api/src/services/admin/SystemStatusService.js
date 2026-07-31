@@ -78,6 +78,46 @@ export class SystemStatusService {
     };
   }
 
+  async getVectorStatus() {
+    const [chunks, embeddings, missing, failed, queue] = await Promise.all([
+      this.pool.query(
+        'SELECT COUNT(*)::int AS total, COALESCE(AVG(token_count), 0) AS average_tokens FROM knowledge_vector_chunks'
+      ),
+      this.pool.query(
+        "SELECT COUNT(*)::int AS total FROM knowledge_vector_embeddings WHERE status = 'ready'"
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS total
+         FROM knowledge_vector_chunks c
+         LEFT JOIN knowledge_vector_embeddings e ON e.chunk_id = c.id AND e.status = 'ready'
+         WHERE e.chunk_id IS NULL`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS total
+         FROM knowledge_documents
+         WHERE processing_status = 'failed' OR embedding_status = 'failed'`
+      ),
+      this.pool.query(
+        "SELECT COUNT(*)::int AS total FROM knowledge_index_jobs WHERE status IN ('queued', 'running')"
+      ),
+    ]);
+
+    const chunkCount = chunks.rows[0]?.total || 0;
+    const embeddingCount = embeddings.rows[0]?.total || 0;
+
+    return {
+      provider: env.embeddingProvider || 'mock',
+      model: env.embeddingModel || 'mock-hash-v1',
+      chunks: chunkCount,
+      embeddings: embeddingCount,
+      coveragePercent: chunkCount ? Number(((embeddingCount / chunkCount) * 100).toFixed(1)) : 0,
+      averageChunkTokens: Number(Number(chunks.rows[0]?.average_tokens || 0).toFixed(1)),
+      missingEmbeddings: missing.rows[0]?.total || 0,
+      failedIndexing: failed.rows[0]?.total || 0,
+      queueSize: queue.rows[0]?.total || 0,
+    };
+  }
+
   validateEnvironment() {
     const issues = [];
 
@@ -114,13 +154,14 @@ export class SystemStatusService {
   }
 
   async getSystemStatus() {
-    const [health, settings, dashboard, migrationVersion, pending, storage] = await Promise.all([
+    const [health, settings, dashboard, migrationVersion, pending, storage, vector] = await Promise.all([
       this.healthService.getHealth(),
       this.systemSettingsService.getSettings(),
       this.dashboardService.getDashboard(),
       this.getMigrationVersion(),
       this.getPendingCounts(),
       this.getStorageUsage(),
+      this.getVectorStatus(),
     ]);
 
     const environment = this.validateEnvironment();
@@ -146,6 +187,7 @@ export class SystemStatusService {
       database: health.checks.database,
       claudeApi,
       storage,
+      vector,
       aiUsage: {
         totalRequests: dashboard.totalRequests,
         totalCost: dashboard.totalAiCost,

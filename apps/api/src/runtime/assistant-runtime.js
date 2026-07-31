@@ -22,6 +22,7 @@ import { PersistenceService } from '../services/persistence/PersistenceService.j
 import { SuggestionEngine } from '../services/feedback/SuggestionEngine.js';
 import { ContextRanker } from '../services/retrieval/ContextRanker.js';
 import { DocumentChunker } from '../services/retrieval/DocumentChunker.js';
+import { DocumentIngestionService } from '../services/retrieval/DocumentIngestionService.js';
 import { DocumentIndexer } from '../services/retrieval/DocumentIndexer.js';
 import { EmbeddingIndex } from '../services/retrieval/EmbeddingIndex.js';
 import { EmbeddingService } from '../services/retrieval/EmbeddingService.js';
@@ -30,7 +31,12 @@ import { KeywordRetriever } from '../services/retrieval/KeywordRetriever.js';
 import { RetrievalService } from '../services/retrieval/RetrievalService.js';
 import { SemanticRetriever } from '../services/retrieval/SemanticRetriever.js';
 import { databasePool } from './database-runtime.js';
-import { listDocumentSources, listDocuments, listPrompts } from './content-runtime.js';
+import {
+  contentCatalogService,
+  listDocumentSources,
+  listDocuments,
+  listPrompts,
+} from './content-runtime.js';
 
 const databasePoolRef = databasePool;
 export const persistenceService = new PersistenceService(databasePoolRef, {
@@ -63,7 +69,8 @@ export const aiGateway = new AIGateway({
   streamingManager: new StreamingManager({ enabled: env.enableStreaming }),
 });
 const documentChunker = new DocumentChunker();
-const documentIndexer = new DocumentIndexer({ documentChunker });
+const documentIngestionService = new DocumentIngestionService();
+const documentIndexer = new DocumentIndexer({ documentChunker, documentIngestionService });
 const embeddingService = new EmbeddingService();
 const embeddingIndex = new EmbeddingIndex();
 const keywordRetriever = new KeywordRetriever();
@@ -82,6 +89,7 @@ export const retrievalService = new RetrievalService({
   contextRanker,
   documents: listDocuments,
   rawSources: listDocumentSources,
+  vectorRepository: contentCatalogService.documentRepository,
 });
 
 export const conversationService = new ConversationService({

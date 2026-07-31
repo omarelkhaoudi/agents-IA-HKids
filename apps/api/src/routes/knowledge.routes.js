@@ -15,6 +15,8 @@ import {
   knowledgeReviewBodySchema,
   knowledgeTagBodySchema,
   knowledgeVersionParamsSchema,
+  vectorIndexActionBodySchema,
+  vectorIndexJobsQuerySchema,
 } from '../validation/schemas.js';
 
 const knowledgeRouter = Router();
@@ -35,6 +37,74 @@ knowledgeRouter.get('/knowledge/dashboard', async (_request, response) => {
 
 knowledgeRouter.get('/knowledge/analytics', async (_request, response) => {
   response.json(await knowledgePlatformService.getAnalytics());
+});
+
+knowledgeRouter.get('/knowledge/vector/stats', async (_request, response) => {
+  response.json(await retrievalService.getVectorStats());
+});
+
+knowledgeRouter.get(
+  '/knowledge/index/jobs',
+  validate({ query: vectorIndexJobsQuerySchema }),
+  async (request, response) => {
+    response.json(await retrievalService.listIndexJobs(request.query));
+  }
+);
+
+knowledgeRouter.post(
+  '/knowledge/index/reindex',
+  validate({ body: vectorIndexActionBodySchema }),
+  async (request, response) => {
+    const payload = {
+      actor: actorFrom(request, request.body.actor),
+      force: request.body.force !== false,
+      background: request.body.background !== false,
+    };
+
+    if (request.body.scope === 'document' && request.body.targetId) {
+      response.status(202).json(await retrievalService.reindexDocument(request.body.targetId, payload));
+      return;
+    }
+
+    if (request.body.scope === 'collection' && request.body.targetId) {
+      response
+        .status(202)
+        .json(await retrievalService.reindexCollection(request.body.targetId, payload));
+      return;
+    }
+
+    if (request.body.scope === 'cache') {
+      response.json({ cleared: retrievalService.clearCache() });
+      return;
+    }
+
+    response.status(202).json(await retrievalService.reindexAll(payload));
+  }
+);
+
+knowledgeRouter.post(
+  '/knowledge/index/jobs/retry-failed',
+  validate({ body: vectorIndexActionBodySchema }),
+  async (request, response) => {
+    response.status(202).json(
+      await retrievalService.retryFailedJobs({
+        actor: actorFrom(request, request.body.actor),
+        background: request.body.background !== false,
+      })
+    );
+  }
+);
+
+knowledgeRouter.post(
+  '/knowledge/index/jobs/:id/cancel',
+  validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.json(await retrievalService.cancelIndexJob(request.params.id, actorFrom(request, request.body.actor)));
+  }
+);
+
+knowledgeRouter.post('/knowledge/vector/cache/clear', async (_request, response) => {
+  response.json({ cleared: retrievalService.clearCache() });
 });
 
 knowledgeRouter.get('/knowledge/search', async (request, response) => {
@@ -215,6 +285,34 @@ knowledgeRouter.get(
   validate({ params: idParamsSchema }),
   async (request, response) => {
     response.json({ items: await knowledgePlatformService.listVersions(request.params.id) });
+  }
+);
+
+knowledgeRouter.post(
+  '/knowledge/documents/:id/reindex',
+  validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.status(202).json(
+      await retrievalService.reindexDocument(request.params.id, {
+        actor: actorFrom(request, request.body.actor),
+        force: request.body.force !== false,
+        background: request.body.background !== false,
+      })
+    );
+  }
+);
+
+knowledgeRouter.post(
+  '/knowledge/collections/:id/reindex',
+  validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.status(202).json(
+      await retrievalService.reindexCollection(request.params.id, {
+        actor: actorFrom(request, request.body.actor),
+        force: request.body.force !== false,
+        background: request.body.background !== false,
+      })
+    );
   }
 );
 

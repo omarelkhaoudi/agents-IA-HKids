@@ -88,6 +88,17 @@ export interface SystemStatus {
     approximateMegabytes: number;
     note: string;
   };
+  vector?: {
+    provider: string;
+    model: string;
+    chunks: number;
+    embeddings: number;
+    coveragePercent: number;
+    averageChunkTokens: number;
+    missingEmbeddings: number;
+    failedIndexing: number;
+    queueSize: number;
+  };
   aiUsage: {
     totalRequests: number;
     totalCost: number;

@@ -397,6 +397,32 @@ export const dmsImportBodySchema = z.object({
 
 export const retrievalSearchBodySchema = z.object({
   question: longText.min(1).max(5000),
+  topK: z.coerce.number().int().min(1).max(30).optional(),
+  agentCode: shortText.optional(),
+  promptId: idSchema.optional(),
+  documentIds: z.array(idSchema).max(200).optional(),
+  collectionIds: z.array(idSchema).max(50).optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+  category: shortText.optional(),
+  language: z.string().trim().max(20).optional(),
+  securityClassifications: z.array(shortText).max(10).optional(),
+  promptAwareText: mediumText.optional(),
+  promptContext: mediumText.optional(),
+  promptName: shortText.optional(),
+  promptObjective: mediumText.optional(),
+});
+
+export const vectorIndexActionBodySchema = z.object({
+  scope: z.enum(['document', 'collection', 'all', 'cache']).optional(),
+  targetId: idSchema.nullable().optional(),
+  force: z.boolean().optional(),
+  background: z.boolean().optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const vectorIndexJobsQuerySchema = z.object({
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
 export const createAgentBodySchema = z.object({
@@ -485,7 +511,7 @@ export const observabilitySnapshotsQuerySchema = z.object({
 
 export const observabilityExportQuerySchema = z.object({
   dataset: z
-    .enum(['usage', 'agents', 'models', 'alerts', 'timeline', 'conversations'])
+    .enum(['usage', 'agents', 'models', 'alerts', 'timeline', 'conversations', 'vector'])
     .default('usage'),
   format: z.enum(['json', 'csv']).default('json'),
   days: z.coerce.number().int().min(1).max(365).optional(),

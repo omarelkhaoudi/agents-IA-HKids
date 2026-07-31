@@ -103,7 +103,7 @@ export async function resolveAlert(id: string): Promise<PlatformAlert> {
 }
 
 export async function downloadObservabilityExport(
-  dataset: 'usage' | 'agents' | 'models' | 'alerts' | 'timeline' | 'conversations',
+  dataset: 'usage' | 'agents' | 'models' | 'alerts' | 'timeline' | 'conversations' | 'vector',
   format: 'json' | 'csv' = 'csv'
 ): Promise<void> {
   const token = getAccessToken();

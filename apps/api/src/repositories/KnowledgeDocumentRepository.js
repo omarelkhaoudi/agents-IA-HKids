@@ -12,6 +12,11 @@ function asJson(value, fallback) {
   return value;
 }
 
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function computeCompleteness(document) {
   const checks = [
     Boolean(document.title),
@@ -89,6 +94,23 @@ export class KnowledgeDocumentRepository {
       checksum: row.checksum || '',
       byteSize: Number(row.byte_size || 0),
       storageKey: row.storage_key || '',
+      processingStatus: row.processing_status || 'pending',
+      processingError: row.processing_error || '',
+      indexedAt: row.indexed_at || null,
+      indexVersion: Number(row.index_version || 0),
+      embeddingStatus: row.embedding_status || 'missing',
+      embeddingProvider: row.embedding_provider || '',
+      embeddingModel: row.embedding_model || '',
+      chunkCount: Number(row.chunk_count || 0),
+      averageChunkTokens: Number(row.average_chunk_tokens || 0),
+      summary: row.summary || '',
+      keywords: asJson(row.keywords, []),
+      detectedLanguage: row.detected_language || '',
+      contentHash: row.content_hash || '',
+      duplicateOf: row.duplicate_of || null,
+      lastIndexError: row.last_index_error || '',
+      retrievalSuccessCount: Number(row.retrieval_success_count || 0),
+      retrievalFailureCount: Number(row.retrieval_failure_count || 0),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -1078,6 +1100,563 @@ export class KnowledgeDocumentRepository {
         name: folder.name,
         documents: documents.filter((item) => item.folderId === folder.id).length,
       })),
+    };
+  }
+
+  mapVectorChunk(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      documentId: row.document_id,
+      chunkNumber: Number(row.chunk_number || 0),
+      sectionTitle: row.section_title || '',
+      content: row.content || '',
+      contentHash: row.content_hash || '',
+      tokenCount: Number(row.token_count || 0),
+      estimatedTokens: Number(row.token_count || 0),
+      charCount: Number(row.char_count || 0),
+      keywords: asJson(row.keywords, []),
+      language: row.language || '',
+      summary: row.summary || '',
+      aiVisibility: row.ai_visibility !== false,
+      qualityScore: Number(row.quality_score || 0),
+      freshnessScore: Number(row.freshness_score || 0),
+      metadata: asJson(row.metadata, {}),
+      status: row.status || 'pending',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  mapEmbedding(row) {
+    if (!row) return null;
+    return {
+      chunkId: row.chunk_id,
+      documentId: row.document_id,
+      provider: row.provider,
+      model: row.model,
+      dimensions: Number(row.dimensions || 0),
+      embedding: asJson(row.embedding, []),
+      embeddingHash: row.embedding_hash || '',
+      status: row.status || 'missing',
+      latencyMs: Number(row.latency_ms || 0),
+      errorMessage: row.error_message || '',
+      metadata: asJson(row.metadata, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async replaceVectorChunks(documentId, chunks = []) {
+    await this.pool.query('DELETE FROM knowledge_vector_chunks WHERE document_id = $1', [documentId]);
+
+    for (const chunk of chunks) {
+      await this.upsertVectorChunk(chunk);
+    }
+
+    return this.listVectorChunks({ documentId });
+  }
+
+  async upsertVectorChunk(chunk) {
+    await this.pool.query(
+      `
+        INSERT INTO knowledge_vector_chunks (
+          id, document_id, chunk_number, section_title, content, content_hash,
+          token_count, char_count, keywords, language, summary, ai_visibility,
+          quality_score, freshness_score, metadata, status
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16)
+        ON CONFLICT (id) DO UPDATE SET
+          chunk_number = EXCLUDED.chunk_number,
+          section_title = EXCLUDED.section_title,
+          content = EXCLUDED.content,
+          content_hash = EXCLUDED.content_hash,
+          token_count = EXCLUDED.token_count,
+          char_count = EXCLUDED.char_count,
+          keywords = EXCLUDED.keywords,
+          language = EXCLUDED.language,
+          summary = EXCLUDED.summary,
+          ai_visibility = EXCLUDED.ai_visibility,
+          quality_score = EXCLUDED.quality_score,
+          freshness_score = EXCLUDED.freshness_score,
+          metadata = EXCLUDED.metadata,
+          status = EXCLUDED.status,
+          updated_at = NOW()
+      `,
+      [
+        chunk.id,
+        chunk.documentId,
+        chunk.chunkNumber,
+        chunk.sectionTitle || '',
+        chunk.content || '',
+        chunk.contentHash || '',
+        chunk.tokenCount || chunk.estimatedTokens || 0,
+        chunk.charCount || String(chunk.content || '').length,
+        JSON.stringify(chunk.keywords || []),
+        chunk.language || '',
+        chunk.summary || '',
+        chunk.aiVisibility !== false,
+        chunk.qualityScore || 0,
+        chunk.freshnessScore || 0,
+        JSON.stringify(chunk.metadata || {}),
+        chunk.status || 'indexed',
+      ]
+    );
+
+    return this.getVectorChunk(chunk.id);
+  }
+
+  async getVectorChunk(id) {
+    const result = await this.pool.query(
+      'SELECT * FROM knowledge_vector_chunks WHERE id = $1 LIMIT 1',
+      [id]
+    );
+    return this.mapVectorChunk(result.rows[0]);
+  }
+
+  async listVectorChunks({ documentId, status, limit = 2000 } = {}) {
+    const clauses = [];
+    const values = [];
+    if (documentId) {
+      values.push(documentId);
+      clauses.push(`document_id = $${values.length}`);
+    }
+    if (status) {
+      values.push(status);
+      clauses.push(`status = $${values.length}`);
+    }
+    values.push(Math.min(Math.max(Number(limit) || 2000, 1), 10000));
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await this.pool.query(
+      `SELECT * FROM knowledge_vector_chunks ${where} ORDER BY document_id ASC, chunk_number ASC LIMIT $${values.length}`,
+      values
+    );
+    return result.rows.map((row) => this.mapVectorChunk(row));
+  }
+
+  async upsertEmbedding(record) {
+    await this.pool.query(
+      `
+        INSERT INTO knowledge_vector_embeddings (
+          chunk_id, document_id, provider, model, dimensions, embedding,
+          embedding_hash, status, latency_ms, error_message, metadata
+        )
+        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb)
+        ON CONFLICT (chunk_id) DO UPDATE SET
+          provider = EXCLUDED.provider,
+          model = EXCLUDED.model,
+          dimensions = EXCLUDED.dimensions,
+          embedding = EXCLUDED.embedding,
+          embedding_hash = EXCLUDED.embedding_hash,
+          status = EXCLUDED.status,
+          latency_ms = EXCLUDED.latency_ms,
+          error_message = EXCLUDED.error_message,
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW()
+      `,
+      [
+        record.chunkId,
+        record.documentId,
+        record.provider || '',
+        record.model || '',
+        record.dimensions || 0,
+        JSON.stringify(record.embedding || []),
+        record.embeddingHash || '',
+        record.status || 'ready',
+        record.latencyMs || 0,
+        record.errorMessage || '',
+        JSON.stringify(record.metadata || {}),
+      ]
+    );
+
+    return this.getEmbedding(record.chunkId);
+  }
+
+  async getEmbedding(chunkId) {
+    const result = await this.pool.query(
+      'SELECT * FROM knowledge_vector_embeddings WHERE chunk_id = $1 LIMIT 1',
+      [chunkId]
+    );
+    return this.mapEmbedding(result.rows[0]);
+  }
+
+  async listVectorIndexItems({ provider, model, limit = 10000 } = {}) {
+    const values = [];
+    const filters = [`c.ai_visibility = TRUE`, `c.status = 'indexed'`, `e.status = 'ready'`];
+    if (provider) {
+      values.push(provider);
+      filters.push(`e.provider = $${values.length}`);
+    }
+    if (model) {
+      values.push(model);
+      filters.push(`e.model = $${values.length}`);
+    }
+    values.push(Math.min(Math.max(Number(limit) || 10000, 1), 50000));
+    const result = await this.pool.query(
+      `
+        SELECT
+          c.*, e.provider, e.model, e.dimensions, e.embedding, e.embedding_hash,
+          d.title, d.category, d.description, d.tags, d.status AS document_status,
+          d.author, d.owner, d.collection_id, d.priority, d.updated_date, d.updated_at,
+          d.ai_visibility, d.security_classification, d.quality_score
+        FROM knowledge_vector_chunks c
+        INNER JOIN knowledge_vector_embeddings e ON e.chunk_id = c.id
+        INNER JOIN knowledge_documents d ON d.id = c.document_id
+        WHERE ${filters.join(' AND ')}
+          AND d.deleted_at IS NULL
+          AND d.status IN ('active', 'approved', 'review')
+          AND d.ai_visibility = TRUE
+        ORDER BY c.updated_at DESC
+        LIMIT $${values.length}
+      `,
+      values
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      documentId: row.document_id,
+      embedding: asJson(row.embedding, []),
+      provider: row.provider,
+      model: row.model,
+      dimensions: Number(row.dimensions || 0),
+      embeddingHash: row.embedding_hash,
+      tokens: Number(row.token_count || 0),
+      content: row.content,
+      chunkNumber: Number(row.chunk_number || 0),
+      sectionTitle: row.section_title || '',
+      keywords: asJson(row.keywords, []),
+      metadata: {
+        ...asJson(row.metadata, {}),
+        title: row.title,
+        category: row.category,
+        description: row.description,
+        tags: asJson(row.tags, []),
+        author: row.author,
+        owner: row.owner,
+        collectionId: row.collection_id,
+        status: row.document_status,
+        priority: row.priority,
+        updatedDate: row.updated_date,
+        updatedAt: row.updated_at,
+        securityClassification: row.security_classification,
+        qualityScore: Number(row.quality_score || 0),
+      },
+    }));
+  }
+
+  async updateVectorDocumentState(documentId, payload = {}) {
+    const existing = await this.getById(documentId);
+    if (!existing) return null;
+    await this.pool.query(
+      `
+        UPDATE knowledge_documents
+        SET
+          processing_status = $2,
+          processing_error = $3,
+          indexed_at = $4,
+          index_version = $5,
+          embedding_status = $6,
+          embedding_provider = $7,
+          embedding_model = $8,
+          chunk_count = $9,
+          average_chunk_tokens = $10,
+          summary = $11,
+          keywords = $12::jsonb,
+          detected_language = $13,
+          content_hash = $14,
+          duplicate_of = $15,
+          last_index_error = $16,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [
+        documentId,
+        payload.processingStatus || existing.processingStatus || 'pending',
+        payload.processingError || '',
+        payload.indexedAt || existing.indexedAt || null,
+        payload.indexVersion ?? Number(existing.indexVersion || 0) + 1,
+        payload.embeddingStatus || existing.embeddingStatus || 'missing',
+        payload.embeddingProvider || existing.embeddingProvider || '',
+        payload.embeddingModel || existing.embeddingModel || '',
+        payload.chunkCount ?? existing.chunkCount ?? 0,
+        payload.averageChunkTokens ?? existing.averageChunkTokens ?? 0,
+        payload.summary || existing.summary || '',
+        JSON.stringify(payload.keywords || existing.keywords || []),
+        payload.detectedLanguage || existing.detectedLanguage || existing.language || '',
+        payload.contentHash || existing.contentHash || '',
+        payload.duplicateOf || null,
+        payload.lastIndexError || '',
+      ]
+    );
+    return this.getById(documentId);
+  }
+
+  async findDuplicateContent(contentHashValue, excludeDocumentId = '') {
+    if (!contentHashValue) return null;
+    const values = [contentHashValue];
+    let extra = '';
+    if (excludeDocumentId) {
+      values.push(excludeDocumentId);
+      extra = `AND id <> $${values.length}`;
+    }
+    const result = await this.pool.query(
+      `SELECT id, title, version FROM knowledge_documents
+       WHERE content_hash = $1 ${extra}
+       AND deleted_at IS NULL AND status <> 'deleted'
+       ORDER BY updated_at DESC LIMIT 1`,
+      values
+    );
+    return result.rows[0] || null;
+  }
+
+  mapIndexJob(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      scope: row.scope,
+      targetId: row.target_id || null,
+      status: row.status,
+      priority: Number(row.priority || 0),
+      provider: row.provider || '',
+      model: row.model || '',
+      totalDocuments: Number(row.total_documents || 0),
+      totalChunks: Number(row.total_chunks || 0),
+      processedDocuments: Number(row.processed_documents || 0),
+      processedChunks: Number(row.processed_chunks || 0),
+      failedDocuments: Number(row.failed_documents || 0),
+      failedChunks: Number(row.failed_chunks || 0),
+      errorMessage: row.error_message || '',
+      actor: row.actor || '',
+      metadata: asJson(row.metadata, {}),
+      startedAt: row.started_at || null,
+      finishedAt: row.finished_at || null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async createIndexJob(payload = {}) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `
+        INSERT INTO knowledge_index_jobs (
+          id, scope, target_id, status, priority, provider, model, actor, metadata
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+      `,
+      [
+        id,
+        payload.scope || 'all',
+        payload.targetId || null,
+        payload.status || 'queued',
+        payload.priority || 0,
+        payload.provider || '',
+        payload.model || '',
+        payload.actor || '',
+        JSON.stringify(payload.metadata || {}),
+      ]
+    );
+    return this.getIndexJob(id);
+  }
+
+  async getIndexJob(id) {
+    const result = await this.pool.query('SELECT * FROM knowledge_index_jobs WHERE id = $1', [id]);
+    return this.mapIndexJob(result.rows[0]);
+  }
+
+  async updateIndexJob(id, payload = {}) {
+    const existing = await this.getIndexJob(id);
+    if (!existing) return null;
+    const next = { ...existing, ...payload };
+    await this.pool.query(
+      `
+        UPDATE knowledge_index_jobs SET
+          status=$2, total_documents=$3, total_chunks=$4, processed_documents=$5,
+          processed_chunks=$6, failed_documents=$7, failed_chunks=$8, error_message=$9,
+          metadata=$10::jsonb, started_at=$11, finished_at=$12, updated_at=NOW()
+        WHERE id=$1
+      `,
+      [
+        id,
+        next.status || 'queued',
+        next.totalDocuments || 0,
+        next.totalChunks || 0,
+        next.processedDocuments || 0,
+        next.processedChunks || 0,
+        next.failedDocuments || 0,
+        next.failedChunks || 0,
+        next.errorMessage || '',
+        JSON.stringify(next.metadata || {}),
+        next.startedAt || null,
+        next.finishedAt || null,
+      ]
+    );
+    return this.getIndexJob(id);
+  }
+
+  async cancelIndexJob(id, actor = '') {
+    const job = await this.updateIndexJob(id, {
+      status: 'cancelled',
+      finishedAt: new Date(),
+      metadata: { cancelledBy: actor },
+    });
+    return job;
+  }
+
+  async listIndexJobs({ status, limit = 50 } = {}) {
+    const values = [];
+    const filters = [];
+    if (status) {
+      values.push(status);
+      filters.push(`status = $${values.length}`);
+    }
+    values.push(Math.min(Math.max(Number(limit) || 50, 1), 200));
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const result = await this.pool.query(
+      `SELECT * FROM knowledge_index_jobs ${where} ORDER BY created_at DESC LIMIT $${values.length}`,
+      values
+    );
+    return result.rows.map((row) => this.mapIndexJob(row));
+  }
+
+  async recordRetrievalEvent(payload = {}) {
+    const id = payload.id || randomUUID();
+    await this.pool.query(
+      `
+        INSERT INTO knowledge_retrieval_events (
+          id, question_hash, agent_code, prompt_id, provider, model, cache_hit, status,
+          top_k, retrieved_chunk_count, semantic_top_score, latency_ms, error_message, metadata
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb)
+      `,
+      [
+        id,
+        payload.questionHash || '',
+        payload.agentCode || '',
+        payload.promptId || null,
+        payload.provider || '',
+        payload.model || '',
+        Boolean(payload.cacheHit),
+        payload.status || 'success',
+        payload.topK || 0,
+        payload.retrievedChunkCount || 0,
+        toNumber(payload.semanticTopScore),
+        Math.round(toNumber(payload.latencyMs)),
+        payload.errorMessage || '',
+        JSON.stringify(payload.metadata || {}),
+      ]
+    );
+    return id;
+  }
+
+  async getVectorStats({ staleDays = 90 } = {}) {
+    const staleBefore = new Date(Date.now() - Math.max(Number(staleDays) || 90, 1) * 86400000);
+    const [
+      documentTotals,
+      chunkTotals,
+      embeddingTotals,
+      missingEmbeddings,
+      failedIndexing,
+      duplicateTotals,
+      staleKnowledge,
+      recentRetrieval,
+      jobs,
+    ] = await Promise.all([
+      this.pool.query(
+        `SELECT COUNT(*)::int AS documents FROM knowledge_documents WHERE deleted_at IS NULL AND status <> 'deleted'`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS chunks, COALESCE(AVG(token_count), 0) AS average_tokens
+         FROM knowledge_vector_chunks`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS embeddings, COALESCE(AVG(latency_ms), 0) AS embedding_latency_ms
+         FROM knowledge_vector_embeddings WHERE status = 'ready'`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS missing FROM knowledge_vector_chunks c
+         LEFT JOIN knowledge_vector_embeddings e ON e.chunk_id = c.id AND e.status = 'ready'
+         WHERE e.chunk_id IS NULL`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS failed FROM knowledge_documents
+         WHERE processing_status = 'failed' OR embedding_status = 'failed'`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS duplicates FROM knowledge_documents
+         WHERE duplicate_of IS NOT NULL AND deleted_at IS NULL AND status <> 'deleted'`
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS stale FROM knowledge_documents
+         WHERE updated_at < $1 AND deleted_at IS NULL AND status <> 'deleted'`,
+        [staleBefore]
+      ),
+      this.pool.query(
+        `SELECT *
+         FROM knowledge_retrieval_events
+         ORDER BY created_at DESC
+         LIMIT 200`
+      ),
+      this.pool.query(
+        `SELECT status, COUNT(*)::int AS total FROM knowledge_index_jobs GROUP BY status`
+      ),
+    ]);
+
+    const retrievalRows = recentRetrieval.rows;
+    const success = retrievalRows.filter((row) => row.status === 'success').length;
+    const failures = retrievalRows.filter((row) => row.status === 'failed').length;
+    const cacheHits = retrievalRows.filter((row) => row.cache_hit).length;
+    const latest = retrievalRows[0] || {};
+
+    return {
+      documentsIndexed: Number(documentTotals.rows[0]?.documents || 0),
+      chunks: Number(chunkTotals.rows[0]?.chunks || 0),
+      embeddings: Number(embeddingTotals.rows[0]?.embeddings || 0),
+      averageChunkSize: Number(Number(chunkTotals.rows[0]?.average_tokens || 0).toFixed(1)),
+      coverage: Number(
+        chunkTotals.rows[0]?.chunks
+          ? (
+              (Number(embeddingTotals.rows[0]?.embeddings || 0) /
+                Number(chunkTotals.rows[0]?.chunks || 1)) *
+              100
+            ).toFixed(1)
+          : 0
+      ),
+      missingEmbeddings: Number(missingEmbeddings.rows[0]?.missing || 0),
+      failedIndexing: Number(failedIndexing.rows[0]?.failed || 0),
+      duplicates: Number(duplicateTotals.rows[0]?.duplicates || 0),
+      staleKnowledge: Number(staleKnowledge.rows[0]?.stale || 0),
+      retrievalLatency: retrievalRows.length
+        ? Math.round(
+            retrievalRows.reduce((sum, row) => sum + Number(row.latency_ms || 0), 0) /
+              retrievalRows.length
+          )
+        : 0,
+      retrievalSuccess: retrievalRows.length
+        ? Number(((success / retrievalRows.length) * 100).toFixed(1))
+        : 0,
+      retrievalFailures: failures,
+      cacheHitRatio: retrievalRows.length
+        ? Number(((cacheHits / retrievalRows.length) * 100).toFixed(1))
+        : 0,
+      embeddingLatency: Math.round(Number(embeddingTotals.rows[0]?.embedding_latency_ms || 0)),
+      queueSize: jobs.rows
+        .filter((row) => ['queued', 'running'].includes(row.status))
+        .reduce((sum, row) => sum + Number(row.total || 0), 0),
+      jobs: jobs.rows.reduce((acc, row) => {
+        acc[row.status] = Number(row.total || 0);
+        return acc;
+      }, {}),
+      latestRetrieval: latest.id
+        ? {
+            at: latest.created_at,
+            agentCode: latest.agent_code,
+            topK: latest.top_k,
+            chunks: latest.retrieved_chunk_count,
+            semanticTopScore: Number(latest.semantic_top_score || 0),
+            status: latest.status,
+          }
+        : null,
     };
   }
 }

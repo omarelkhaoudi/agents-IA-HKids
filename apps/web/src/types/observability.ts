@@ -1,3 +1,5 @@
+import type { VectorKnowledgeStats } from './knowledge-base';
+
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved';
 export type UsageGranularity = 'hourly' | 'daily' | 'weekly' | 'monthly';
@@ -413,6 +415,7 @@ export interface AnalyticsReport {
     totalPrompts: number;
     totalFeedbacks: number;
   };
+  vector?: VectorKnowledgeStats | null;
 }
 
 export interface TimelineEntry {

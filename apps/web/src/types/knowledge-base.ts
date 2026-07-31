@@ -1,4 +1,12 @@
-export type SupportedDocumentType = 'PDF' | 'DOCX' | 'XLSX' | 'TXT' | 'CSV' | 'MD' | 'HTML';
+export type SupportedDocumentType =
+  | 'PDF'
+  | 'DOCX'
+  | 'XLSX'
+  | 'PPTX'
+  | 'TXT'
+  | 'CSV'
+  | 'MD'
+  | 'HTML';
 
 export type KnowledgeBaseStatus = 'draft' | 'active' | 'review' | 'archived' | 'deleted';
 
@@ -34,6 +42,23 @@ export interface KnowledgeBaseDocument {
   lastReviewedAt?: string | null;
   lastReviewedBy?: string;
   missingMetadata?: string[];
+  processingStatus?: string;
+  processingError?: string;
+  indexedAt?: string | null;
+  indexVersion?: number;
+  embeddingStatus?: string;
+  embeddingProvider?: string;
+  embeddingModel?: string;
+  chunkCount?: number;
+  averageChunkTokens?: number;
+  summary?: string;
+  keywords?: string[];
+  detectedLanguage?: string;
+  contentHash?: string;
+  duplicateOf?: string | null;
+  lastIndexError?: string;
+  retrievalSuccessCount?: number;
+  retrievalFailureCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -163,4 +188,87 @@ export interface DocumentFilters {
 
 export interface DocumentsApiResponse {
   items: KnowledgeBaseDocument[];
+}
+
+export interface VectorEmbeddingProviderInfo {
+  provider: string;
+  model: string;
+  dimensions: number;
+  batchSize: number;
+  remote: boolean;
+  cacheSize: number;
+  stats: {
+    requests: number;
+    cacheHits: number;
+    failures: number;
+    totalLatencyMs: number;
+    lastError: string;
+    averageLatencyMs: number;
+    cacheHitRatio: number;
+  };
+}
+
+export interface VectorKnowledgeStats {
+  documentsIndexed: number;
+  chunks: number;
+  embeddings: number;
+  averageChunkSize: number;
+  coverage: number;
+  missingEmbeddings: number;
+  failedIndexing: number;
+  duplicates: number;
+  staleKnowledge: number;
+  retrievalLatency: number;
+  retrievalSuccess: number;
+  retrievalFailures: number;
+  cacheHitRatio: number;
+  embeddingLatency: number;
+  queueSize: number;
+  provider: string;
+  model: string;
+  dimensions: number;
+  embeddingProvider?: VectorEmbeddingProviderInfo;
+  cache?: {
+    retrievalEntries: number;
+    vectorIndexEntries: number;
+    embeddingEntries: number;
+  };
+  jobs?: Record<string, number>;
+  latestRetrieval?: {
+    at: string;
+    agentCode: string;
+    topK: number;
+    chunks: number;
+    semanticTopScore: number;
+    status: string;
+  } | null;
+}
+
+export interface VectorIndexJob {
+  id: string;
+  scope: 'document' | 'collection' | 'all' | 'cache' | string;
+  targetId: string | null;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  provider: string;
+  model: string;
+  totalDocuments: number;
+  totalChunks: number;
+  processedDocuments: number;
+  processedChunks: number;
+  failedDocuments: number;
+  failedChunks: number;
+  errorMessage: string;
+  actor: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VectorIndexAction {
+  scope?: 'document' | 'collection' | 'all' | 'cache';
+  targetId?: string | null;
+  force?: boolean;
+  background?: boolean;
+  actor?: string;
 }

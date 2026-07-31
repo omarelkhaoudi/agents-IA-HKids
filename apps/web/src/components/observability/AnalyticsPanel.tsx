@@ -48,6 +48,36 @@ export default function AnalyticsPanel({ analytics }: AnalyticsPanelProps) {
           hint={`${analytics.approvals.knowledgeApproved} approved documents`}
           accent="purple"
         />
+        <MetricCard
+          label="Vector success"
+          value={formatPercent(analytics.vector?.retrievalSuccess || 0)}
+          hint={`${analytics.vector?.retrievalFailures || 0} retrieval failures`}
+          accent={(analytics.vector?.retrievalSuccess || 0) >= 95 ? 'emerald' : 'orange'}
+        />
+        <MetricCard
+          label="Vector cache"
+          value={formatPercent(analytics.vector?.cacheHitRatio || 0)}
+          hint={`${analytics.vector?.cache?.vectorIndexEntries || 0} cached index items`}
+          accent="blue"
+        />
+        <MetricCard
+          label="Embedding latency"
+          value={formatDuration(analytics.vector?.embeddingLatency || 0)}
+          hint={`${analytics.vector?.provider || 'mock'} / ${analytics.vector?.model || 'model'}`}
+          accent="cyan"
+        />
+        <MetricCard
+          label="Vector gaps"
+          value={String(
+            (analytics.vector?.missingEmbeddings || 0) + (analytics.vector?.failedIndexing || 0)
+          )}
+          hint={`${analytics.vector?.duplicates || 0} duplicates detected`}
+          accent={
+            (analytics.vector?.missingEmbeddings || 0) + (analytics.vector?.failedIndexing || 0)
+              ? 'orange'
+              : 'emerald'
+          }
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">

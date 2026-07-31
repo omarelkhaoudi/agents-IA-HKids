@@ -33,6 +33,7 @@ export const observabilityService = new ObservabilityService({
   alertService,
   activeRequestTracker,
   dashboardService,
+  retrievalService,
 });
 
 const instrumentationBridge = new InstrumentationBridge({ observabilityService });

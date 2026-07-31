@@ -131,8 +131,31 @@ export interface KnowledgeEvaluation {
   averageCompleteness: number;
   documentsInReview: number;
   coveragePercent: number;
+  vectorCoveragePercent?: number;
+  retrievalPrecision?: number;
+  citationAccuracy?: number;
+  groundedness?: number;
+  hallucinationReduction?: number;
+  knowledgeEffectiveness?: number;
+  semanticRelevance?: number;
+  missingKnowledge?: number;
   retrievalSuccessRate: number;
   retrievalFailures: number;
+  vectorHealth?: {
+    chunks: number;
+    embeddings: number;
+    averageChunkTokens: number;
+    coveragePercent: number;
+    missingEmbeddings: number;
+    failedIndexing: number;
+    retrievalSamples: number;
+    retrievalPrecision: number;
+    retrievalSuccessRate: number;
+    retrievalFailures: number;
+    averageRetrievalLatencyMs: number;
+    semanticRelevance: number;
+    cacheHitRatio: number;
+  };
   freshness: {
     staleDays: number;
     staleDocuments: number;

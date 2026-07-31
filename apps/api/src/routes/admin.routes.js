@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
+import { retrievalService } from '../runtime/assistant-runtime.js';
 import {
   agentConfigurationService,
   agentManagementService,
@@ -15,6 +16,8 @@ import {
   idParamsSchema,
   updateAgentBodySchema,
   updateSettingsBodySchema,
+  vectorIndexActionBodySchema,
+  vectorIndexJobsQuerySchema,
 } from '../validation/schemas.js';
 
 const adminRouter = Router();
@@ -32,6 +35,74 @@ adminRouter.get('/admin/statistics', async (_request, response) => {
 adminRouter.get('/admin/system-status', async (_request, response) => {
   const status = await systemStatusService.getSystemStatus();
   response.json(status);
+});
+
+adminRouter.get('/admin/vector/stats', async (_request, response) => {
+  response.json(await retrievalService.getVectorStats());
+});
+
+adminRouter.get(
+  '/admin/vector/jobs',
+  validate({ query: vectorIndexJobsQuerySchema }),
+  async (request, response) => {
+    response.json(await retrievalService.listIndexJobs(request.query));
+  }
+);
+
+adminRouter.post(
+  '/admin/vector/reindex',
+  validate({ body: vectorIndexActionBodySchema }),
+  async (request, response) => {
+    const payload = {
+      actor: request.body.actor || request.user?.email || request.user?.id || 'admin',
+      force: request.body.force !== false,
+      background: request.body.background !== false,
+    };
+
+    if (request.body.scope === 'document' && request.body.targetId) {
+      response.status(202).json(await retrievalService.reindexDocument(request.body.targetId, payload));
+      return;
+    }
+
+    if (request.body.scope === 'collection' && request.body.targetId) {
+      response
+        .status(202)
+        .json(await retrievalService.reindexCollection(request.body.targetId, payload));
+      return;
+    }
+
+    response.status(202).json(await retrievalService.reindexAll(payload));
+  }
+);
+
+adminRouter.post(
+  '/admin/vector/jobs/:id/cancel',
+  validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.json(
+      await retrievalService.cancelIndexJob(
+        request.params.id,
+        request.body.actor || request.user?.email || request.user?.id || 'admin'
+      )
+    );
+  }
+);
+
+adminRouter.post(
+  '/admin/vector/jobs/retry-failed',
+  validate({ body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.status(202).json(
+      await retrievalService.retryFailedJobs({
+        actor: request.body.actor || request.user?.email || request.user?.id || 'admin',
+        background: request.body.background !== false,
+      })
+    );
+  }
+);
+
+adminRouter.post('/admin/vector/cache/clear', async (_request, response) => {
+  response.json({ cleared: retrievalService.clearCache() });
 });
 
 adminRouter.get(

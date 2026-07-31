@@ -202,9 +202,15 @@ export class SalesAgentService {
       payload.instruction ||
       payload.title ||
       `Prepare a ${documentType.replaceAll('_', ' ')} draft for H-Kids.`;
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
     const prompts = this.filterSalesPrompts(this.listPrompts());
     const selectedPrompt = prompts.find((prompt) => prompt.id === payload.promptId) || prompts[0];
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'sales-agent',
+          promptId: selectedPrompt?.id || payload.promptId,
+          promptAwareText: selectedPrompt?.objective || documentType,
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
     const products = await this.repository.listProducts();
 
     const userMessage = [
@@ -309,12 +315,18 @@ export class SalesAgentService {
     const instruction =
       payload.instruction ||
       `Prepare quotation draft for ${payload.customerName || 'customer'} with suggested commercial wording.`;
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
     const prompts = this.filterSalesPrompts(this.listPrompts());
     const selectedPrompt =
       prompts.find((prompt) => prompt.promptGroupId === 'sales-quotation') ||
       prompts.find((prompt) => prompt.id === payload.promptId) ||
       prompts[0];
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'sales-agent',
+          promptId: selectedPrompt?.id || payload.promptId,
+          promptAwareText: selectedPrompt?.objective || 'quotation',
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
 
     const generation = await this.aiGateway.generate({
       provider: payload.provider,

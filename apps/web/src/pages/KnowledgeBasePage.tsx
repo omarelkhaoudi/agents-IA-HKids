@@ -8,15 +8,22 @@ import {
   addKnowledgeLink,
   archiveKnowledgeDocument,
   bulkKnowledgeAction,
+  cancelKnowledgeIndexJob,
+  clearKnowledgeVectorCache,
   duplicateKnowledgeVersion,
   exportKnowledgeMetadata,
   getKnowledgeBootstrap,
   getKnowledgeDocumentDetail,
+  getKnowledgeIndexJobs,
+  getKnowledgeVectorStats,
   mergeKnowledgeTags,
   publishKnowledgeDocument,
   requestKnowledgeCorrections,
+  reindexKnowledge,
+  reindexKnowledgeDocument,
   restoreKnowledgeVersion,
   submitKnowledgeReview,
+  retryFailedKnowledgeIndexJobs,
 } from '../api/knowledge';
 import DocumentDialog from '../components/knowledge-base/DocumentDialog';
 import DocumentPreviewPanel from '../components/knowledge-base/DocumentPreviewPanel';
@@ -28,6 +35,7 @@ import KnowledgeDashboardMetrics from '../components/knowledge-base/KnowledgeDas
 import KnowledgeRelationshipsPanel from '../components/knowledge-base/KnowledgeRelationshipsPanel';
 import KnowledgeReviewQueue from '../components/knowledge-base/KnowledgeReviewQueue';
 import KnowledgeVersionTimeline from '../components/knowledge-base/KnowledgeVersionTimeline';
+import VectorKnowledgeHealthPanel from '../components/knowledge-base/VectorKnowledgeHealthPanel';
 import SidebarNav from '../components/sidebar/SidebarNav';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -44,6 +52,8 @@ import type {
   KnowledgeLink,
   KnowledgeTag,
   KnowledgeVersion,
+  VectorIndexJob,
+  VectorKnowledgeStats,
 } from '../types/knowledge-base';
 
 const sections = [
@@ -78,6 +88,8 @@ export default function KnowledgeBasePage() {
   const [tags, setTags] = useState<KnowledgeTag[]>([]);
   const [dashboard, setDashboard] = useState<KnowledgeDashboard | null>(null);
   const [analytics, setAnalytics] = useState<KnowledgeAnalytics | null>(null);
+  const [vectorStats, setVectorStats] = useState<VectorKnowledgeStats | null>(null);
+  const [indexJobs, setIndexJobs] = useState<VectorIndexJob[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeBaseDocument | null>(null);
   const [versions, setVersions] = useState<KnowledgeVersion[]>([]);
   const [links, setLinks] = useState<KnowledgeLink[]>([]);
@@ -91,23 +103,39 @@ export default function KnowledgeBasePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [mergeSource, setMergeSource] = useState('');
   const [mergeTarget, setMergeTarget] = useState('');
   const [linkType, setLinkType] = useState<KnowledgeLink['linkedType']>('prompt');
   const [linkId, setLinkId] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
 
+  const refreshVectorHealth = useCallback(async () => {
+    const [stats, jobs] = await Promise.all([
+      getKnowledgeVectorStats().catch(() => null),
+      getKnowledgeIndexJobs({ limit: 20 }).catch(() => ({ items: [] })),
+    ]);
+    setVectorStats(stats);
+    setIndexJobs(jobs.items);
+  }, []);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getKnowledgeBootstrap();
+      const [data, stats, jobs] = await Promise.all([
+        getKnowledgeBootstrap(),
+        getKnowledgeVectorStats().catch(() => null),
+        getKnowledgeIndexJobs({ limit: 20 }).catch(() => ({ items: [] })),
+      ]);
       setBootstrap(data);
       setDocuments(data.documents);
       setCollections(data.collections);
       setTags(data.tags);
       setDashboard(data.dashboard);
       setAnalytics(data.analytics);
+      setVectorStats(stats);
+      setIndexJobs(jobs.items);
       setSelectedDocument((current) => {
         if (!current) return data.documents[0] || null;
         return data.documents.find((item) => item.id === current.id) || data.documents[0] || null;
@@ -281,6 +309,39 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const runVectorAction = async (
+    action: 'all' | 'selected' | 'retry' | 'clear' | 'cancel',
+    jobId = ''
+  ) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      if (action === 'all') {
+        await reindexKnowledge({ scope: 'all', force: true, background: true });
+        setNotice('Vector re-index queued for all knowledge documents.');
+      }
+      if (action === 'selected' && selectedDocument) {
+        await reindexKnowledgeDocument(selectedDocument.id, { force: true, background: true });
+        setNotice(`Vector re-index queued for ${selectedDocument.title}.`);
+      }
+      if (action === 'retry') {
+        const result = await retryFailedKnowledgeIndexJobs({ background: true });
+        setNotice(`${result.retried} failed vector job(s) queued for retry.`);
+      }
+      if (action === 'clear') {
+        await clearKnowledgeVectorCache();
+        setNotice('Vector retrieval cache cleared.');
+      }
+      if (action === 'cancel' && jobId) {
+        await cancelKnowledgeIndexJob(jobId);
+        setNotice('Indexing job cancellation requested.');
+      }
+      await refreshVectorHealth();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === '/' && !(event.target instanceof HTMLInputElement)) {
@@ -361,6 +422,10 @@ export default function KnowledgeBasePage() {
             <Panel className="p-10 text-center text-sm text-rose-300">{error}</Panel>
           ) : (
             <>
+              {notice ? (
+                <Panel className="border-cyan-400/20 p-4 text-sm text-cyan-200">{notice}</Panel>
+              ) : null}
+
               {section === 'home' && dashboard ? (
                 <div className="space-y-6">
                   <KnowledgeDashboardMetrics dashboard={dashboard} />
@@ -558,70 +623,84 @@ export default function KnowledgeBasePage() {
               ) : null}
 
               {section === 'admin' ? (
-                <Panel className="space-y-4 p-5">
-                  <h2 className="text-lg font-semibold text-white">Bulk administration</h2>
-                  <p className="text-sm text-slate-400">
-                    Selected documents: {selectedIds.length}. Use the documents table checkboxes first.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button disabled={busy} onClick={() => void runBulk('archive')}>
-                      Archive
-                    </Button>
-                    <Button disabled={busy} onClick={() => void runBulk('duplicate')}>
-                      Duplicate
-                    </Button>
-                    <Button disabled={busy} onClick={() => void runBulk('tag')}>
-                      Mass tag
-                    </Button>
-                    <Button disabled={busy} onClick={() => void runBulk('move')}>
-                      Move to collection
-                    </Button>
-                    <Button
-                      disabled={busy}
-                      variant="ghost"
-                      className="text-rose-300"
-                      onClick={() => void runBulk('delete')}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      disabled={busy}
-                      variant="secondary"
-                      onClick={() => {
-                        void (async () => {
-                          const exported = await exportKnowledgeMetadata();
-                          const blob = new Blob([JSON.stringify(exported, null, 2)], {
-                            type: 'application/json',
-                          });
-                          const url = URL.createObjectURL(blob);
-                          const anchor = document.createElement('a');
-                          anchor.href = url;
-                          anchor.download = 'knowledge-metadata.json';
-                          anchor.click();
-                          URL.revokeObjectURL(url);
-                        })();
-                      }}
-                    >
-                      Export metadata
-                    </Button>
-                  </div>
-                  {selectedDocument ? (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button
-                        disabled={busy || selectedDocument.status !== 'draft'}
-                        onClick={() => void runReviewAction('submit', selectedDocument)}
-                      >
-                        Submit review
+                <div className="space-y-5">
+                  <VectorKnowledgeHealthPanel
+                    stats={vectorStats}
+                    jobs={indexJobs}
+                    busy={busy}
+                    selectedDocumentTitle={selectedDocument?.title}
+                    onReindexAll={() => void runVectorAction('all')}
+                    onReindexSelected={() => void runVectorAction('selected')}
+                    onRetryFailed={() => void runVectorAction('retry')}
+                    onClearCache={() => void runVectorAction('clear')}
+                    onCancelJob={(jobId) => void runVectorAction('cancel', jobId)}
+                  />
+
+                  <Panel className="space-y-4 p-5">
+                    <h2 className="text-lg font-semibold text-white">Bulk administration</h2>
+                    <p className="text-sm text-slate-400">
+                      Selected documents: {selectedIds.length}. Use the documents table checkboxes first.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button disabled={busy} onClick={() => void runBulk('archive')}>
+                        Archive
+                      </Button>
+                      <Button disabled={busy} onClick={() => void runBulk('duplicate')}>
+                        Duplicate
+                      </Button>
+                      <Button disabled={busy} onClick={() => void runBulk('tag')}>
+                        Mass tag
+                      </Button>
+                      <Button disabled={busy} onClick={() => void runBulk('move')}>
+                        Move to collection
                       </Button>
                       <Button
-                        disabled={busy || selectedDocument.status !== 'review'}
-                        onClick={() => void runReviewAction('publish', selectedDocument)}
+                        disabled={busy}
+                        variant="ghost"
+                        className="text-rose-300"
+                        onClick={() => void runBulk('delete')}
                       >
-                        Publish
+                        Delete
+                      </Button>
+                      <Button
+                        disabled={busy}
+                        variant="secondary"
+                        onClick={() => {
+                          void (async () => {
+                            const exported = await exportKnowledgeMetadata();
+                            const blob = new Blob([JSON.stringify(exported, null, 2)], {
+                              type: 'application/json',
+                            });
+                            const url = URL.createObjectURL(blob);
+                            const anchor = document.createElement('a');
+                            anchor.href = url;
+                            anchor.download = 'knowledge-metadata.json';
+                            anchor.click();
+                            URL.revokeObjectURL(url);
+                          })();
+                        }}
+                      >
+                        Export metadata
                       </Button>
                     </div>
-                  ) : null}
-                </Panel>
+                    {selectedDocument ? (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Button
+                          disabled={busy || selectedDocument.status !== 'draft'}
+                          onClick={() => void runReviewAction('submit', selectedDocument)}
+                        >
+                          Submit review
+                        </Button>
+                        <Button
+                          disabled={busy || selectedDocument.status !== 'review'}
+                          onClick={() => void runReviewAction('publish', selectedDocument)}
+                        >
+                          Publish
+                        </Button>
+                      </div>
+                    ) : null}
+                  </Panel>
+                </div>
               ) : null}
             </>
           )}

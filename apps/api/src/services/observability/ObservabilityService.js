@@ -154,12 +154,14 @@ export class ObservabilityService {
     alertService,
     activeRequestTracker,
     dashboardService,
+    retrievalService = null,
   }) {
     this.observabilityRepository = observabilityRepository;
     this.systemHealthMonitor = systemHealthMonitor;
     this.alertService = alertService;
     this.activeRequestTracker = activeRequestTracker;
     this.dashboardService = dashboardService;
+    this.retrievalService = retrievalService;
   }
 
   async recordEvent(payload) {
@@ -459,7 +461,7 @@ export class ObservabilityService {
     const windowDays = Math.min(Math.max(Number(days) || 30, 1), 365);
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
-    const [agents, prompts, documents, users, approvals, summary, platform] = await Promise.all([
+    const [agents, prompts, documents, users, approvals, summary, platform, vector] = await Promise.all([
       this.observabilityRepository.getAgentUsage({ since }),
       this.observabilityRepository.getPromptUsage({ limit: 10 }),
       this.observabilityRepository.getDocumentUsage({ limit: 10 }),
@@ -467,6 +469,9 @@ export class ObservabilityService {
       this.observabilityRepository.getApprovalStatistics(),
       this.observabilityRepository.getUsageSummary({ since }),
       this.dashboardService.getDashboard(),
+      this.retrievalService?.getVectorStats
+        ? this.retrievalService.getVectorStats()
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -491,6 +496,7 @@ export class ObservabilityService {
         totalPrompts: platform.totalPrompts,
         totalFeedbacks: platform.totalFeedbacks,
       },
+      vector,
     };
   }
 
@@ -651,6 +657,8 @@ export class ObservabilityService {
       alerts: async () => (await this.alertService.listAlerts({ limit: 200 })).items,
       timeline: async () => (await this.getTimeline({ days: days || 30, limit: 500 })).items,
       conversations: async () => (await this.getConversationLogs({ limit: 200 })).items,
+      vector: async () =>
+        this.retrievalService?.getVectorStats ? [await this.retrievalService.getVectorStats()] : [],
     };
 
     const loader = datasets[dataset];

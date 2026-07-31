@@ -1,7 +1,12 @@
 import { apiRequest } from './client';
+import type { VectorIndexAction, VectorIndexJob, VectorKnowledgeStats } from '../types/knowledge-base';
 
 export async function getDmsBootstrap() {
   return apiRequest('/api/dms/bootstrap');
+}
+
+export async function getDmsVectorStats(): Promise<VectorKnowledgeStats> {
+  return apiRequest('/api/dms/vector/stats');
 }
 
 export async function searchDms(params: Record<string, string | number | undefined> = {}) {
@@ -46,6 +51,16 @@ export async function startDmsUploadSession(payload: Record<string, unknown>) {
 
 export async function getDmsDocumentDetail(documentId: string) {
   return apiRequest(`/api/dms/documents/${documentId}`);
+}
+
+export async function reindexDmsDocument(
+  documentId: string,
+  payload: VectorIndexAction = {}
+): Promise<VectorIndexJob> {
+  return apiRequest(`/api/dms/documents/${encodeURIComponent(documentId)}/reindex`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function moveDmsDocuments(documentIds: string[], folderId?: string | null) {

@@ -1,19 +1,40 @@
 import { useEffect, useState } from 'react';
-import { getSystemStatus } from '../../api/admin';
+import {
+  cancelAdminVectorJob,
+  clearAdminVectorCache,
+  getAdminVectorJobs,
+  getAdminVectorStats,
+  getSystemStatus,
+  reindexAdminVector,
+  retryFailedAdminVectorJobs,
+} from '../../api/admin';
 import type { SystemStatus } from '../../types/admin';
+import type { VectorIndexJob, VectorKnowledgeStats } from '../../types/knowledge-base';
+import VectorKnowledgeHealthPanel from '../../components/knowledge-base/VectorKnowledgeHealthPanel';
 import Panel from '../../components/ui/Panel';
 
 export default function AdminSystemStatusPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [vectorStats, setVectorStats] = useState<VectorKnowledgeStats | null>(null);
+  const [vectorJobs, setVectorJobs] = useState<VectorIndexJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError('');
       try {
-        setStatus(await getSystemStatus());
+        const [systemStatus, stats, jobs] = await Promise.all([
+          getSystemStatus(),
+          getAdminVectorStats().catch(() => null),
+          getAdminVectorJobs({ limit: 20 }).catch(() => ({ items: [] })),
+        ]);
+        setStatus(systemStatus);
+        setVectorStats(stats);
+        setVectorJobs(jobs.items);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : 'Unable to load system status.');
       } finally {
@@ -23,6 +44,41 @@ export default function AdminSystemStatusPage() {
 
     void load();
   }, []);
+
+  async function refreshVector() {
+    const [stats, jobs] = await Promise.all([
+      getAdminVectorStats().catch(() => null),
+      getAdminVectorJobs({ limit: 20 }).catch(() => ({ items: [] })),
+    ]);
+    setVectorStats(stats);
+    setVectorJobs(jobs.items);
+  }
+
+  async function runVectorAction(action: 'reindex' | 'retry' | 'clear' | 'cancel', jobId = '') {
+    setBusy(true);
+    setNotice('');
+    try {
+      if (action === 'reindex') {
+        await reindexAdminVector({ scope: 'all', force: true, background: true });
+        setNotice('Vector re-index queued for the full knowledge corpus.');
+      }
+      if (action === 'retry') {
+        const result = await retryFailedAdminVectorJobs({ background: true });
+        setNotice(`${result.retried} failed vector job(s) queued for retry.`);
+      }
+      if (action === 'clear') {
+        await clearAdminVectorCache();
+        setNotice('Vector cache cleared.');
+      }
+      if (action === 'cancel' && jobId) {
+        await cancelAdminVectorJob(jobId);
+        setNotice('Indexing job cancellation requested.');
+      }
+      await refreshVector();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (loading) {
     return <Panel className="p-10 text-center text-sm text-slate-400">Loading system status...</Panel>;
@@ -34,6 +90,10 @@ export default function AdminSystemStatusPage() {
 
   return (
     <div className="space-y-6">
+      {notice ? (
+        <Panel className="border-cyan-400/20 p-4 text-sm text-cyan-200">{notice}</Panel>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="System" value={status.system.status} />
         <MetricCard label="Database" value={status.database.status} />
@@ -47,7 +107,22 @@ export default function AdminSystemStatusPage() {
         <MetricCard label="Pending approvals" value={String(status.pendingApprovals)} />
         <MetricCard label="Pending feedback" value={String(status.pendingFeedback)} />
         <MetricCard label="Storage (MB)" value={String(status.storage.approximateMegabytes)} />
+        <MetricCard
+          label="Vector coverage"
+          value={`${Number(status.vector?.coveragePercent || 0).toFixed(1)}%`}
+        />
+        <MetricCard label="Index queue" value={String(status.vector?.queueSize || 0)} />
       </div>
+
+      <VectorKnowledgeHealthPanel
+        stats={vectorStats}
+        jobs={vectorJobs}
+        busy={busy}
+        onReindexAll={() => void runVectorAction('reindex')}
+        onRetryFailed={() => void runVectorAction('retry')}
+        onClearCache={() => void runVectorAction('clear')}
+        onCancelJob={(jobId) => void runVectorAction('cancel', jobId)}
+      />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel className="p-5">

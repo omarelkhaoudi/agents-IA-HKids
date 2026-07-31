@@ -11,6 +11,7 @@ import {
   dmsUploadSessionBodySchema,
   dmsWorkflowBodySchema,
   idParamsSchema,
+  vectorIndexActionBodySchema,
 } from '../validation/schemas.js';
 
 const dmsRouter = Router();
@@ -33,6 +34,10 @@ dmsRouter.get('/dms/dashboard', async (_request, response) => {
 
 dmsRouter.get('/dms/analytics', async (_request, response) => {
   response.json(await documentManagementService.getAnalytics());
+});
+
+dmsRouter.get('/dms/vector/stats', async (_request, response) => {
+  response.json(await retrievalService.getVectorStats());
 });
 
 dmsRouter.get('/dms/search', async (request, response) => {
@@ -285,6 +290,20 @@ dmsRouter.get(
     } catch (error) {
       response.status(error.statusCode || 400).json({ message: error.message });
     }
+  }
+);
+
+dmsRouter.post(
+  '/dms/documents/:id/reindex',
+  validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
+  async (request, response) => {
+    response.status(202).json(
+      await retrievalService.reindexDocument(request.params.id, {
+        actor: actorFrom(request, request.body.actor),
+        force: request.body.force !== false,
+        background: request.body.background !== false,
+      })
+    );
   }
 );
 

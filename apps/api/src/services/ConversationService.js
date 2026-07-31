@@ -53,7 +53,14 @@ export class ConversationService {
 
     const selectedDocuments = this.knowledgeRepository.getDocumentsByIds(selectedDocumentIds);
     const resolvedAgentCode = agentCode || 'administrative-assistant';
-    const retrievedContext = this.retrievalService.retrieveRelevantContext(userMessage);
+    const retrievedContext = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(userMessage, {
+          agentCode: resolvedAgentCode,
+          promptId: selectedPromptId,
+          documentIds: selectedDocumentIds,
+          promptAwareText: prompt.objective || prompt.name,
+        })
+      : this.retrievalService.retrieveRelevantContext(userMessage);
     const approvedGuidance = this.feedbackService
       ? await this.feedbackService.getApprovedGuidance(resolvedAgentCode)
       : '';

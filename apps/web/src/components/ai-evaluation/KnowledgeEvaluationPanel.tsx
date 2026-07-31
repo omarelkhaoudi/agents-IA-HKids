@@ -37,7 +37,57 @@ export default function KnowledgeEvaluationPanel({ knowledge }: KnowledgeEvaluat
           hint={`Documents untouched for ${knowledge.freshness.staleDays} days`}
           accent={knowledge.freshness.staleDocuments > 0 ? 'orange' : 'emerald'}
         />
+        <MetricCard
+          label="Vector coverage"
+          value={formatPercent(knowledge.vectorCoveragePercent || 0)}
+          hint={`${knowledge.vectorHealth?.embeddings || 0}/${knowledge.vectorHealth?.chunks || 0} embeddings`}
+          accent={scoreAccent(knowledge.vectorCoveragePercent || 0)}
+        />
+        <MetricCard
+          label="Retrieval precision"
+          value={formatPercent(knowledge.retrievalPrecision || 0)}
+          hint={`Citation accuracy ${formatPercent(knowledge.citationAccuracy || 0)}`}
+          accent={scoreAccent(knowledge.retrievalPrecision || 0)}
+        />
+        <MetricCard
+          label="Groundedness"
+          value={formatPercent(knowledge.groundedness || 0)}
+          hint={`Hallucination reduction ${formatPercent(knowledge.hallucinationReduction || 0)}`}
+          accent={scoreAccent(knowledge.groundedness || 0)}
+        />
+        <MetricCard
+          label="Semantic relevance"
+          value={formatPercent(knowledge.semanticRelevance || 0)}
+          hint={`${knowledge.missingKnowledge || 0} missing knowledge signals`}
+          accent={scoreAccent(knowledge.semanticRelevance || 0)}
+        />
       </div>
+
+      {knowledge.vectorHealth ? (
+        <Panel className="p-5">
+          <h2 className="text-lg font-semibold text-white">Retrieval quality</h2>
+          <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-white/4 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Samples</p>
+              <p className="mt-2 text-xl font-semibold text-white">
+                {formatNumber(knowledge.vectorHealth.retrievalSamples)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/4 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Latency</p>
+              <p className="mt-2 text-xl font-semibold text-white">
+                {knowledge.vectorHealth.averageRetrievalLatencyMs} ms
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/4 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Cache hit ratio</p>
+              <p className="mt-2 text-xl font-semibold text-white">
+                {formatPercent(knowledge.vectorHealth.cacheHitRatio)}
+              </p>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
 
       {knowledge.knowledgeGaps.length > 0 ? (
         <Panel className="border-orange-400/20 p-5">

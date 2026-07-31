@@ -564,9 +564,19 @@ export class PromptPlatformService {
 
     if (options.includeKnowledge && this.retrievalService) {
       try {
-        const retrieval = this.retrievalService.retrieveRelevantContext(
-          options.question || prompt.objective || prompt.name
-        );
+        const retrieval = this.retrievalService.retrieveRelevantContextAsync
+          ? await this.retrievalService.retrieveRelevantContextAsync(
+              options.question || prompt.objective || prompt.name,
+              {
+                agentCode: prompt.agentCode,
+                promptId: prompt.id,
+                collectionIds: prompt.knowledgeCollectionIds || [],
+                promptAwareText: assembledPrompt,
+              }
+            )
+          : this.retrievalService.retrieveRelevantContext(
+              options.question || prompt.objective || prompt.name
+            );
         retrievedKnowledge =
           retrieval?.contextText ||
           retrieval?.assembledContext ||

@@ -202,7 +202,9 @@ export default function AdminObservabilityPage() {
   }, []);
 
   const runExport = useCallback(
-    async (dataset: 'usage' | 'agents' | 'models' | 'alerts' | 'timeline' | 'conversations') => {
+    async (
+      dataset: 'usage' | 'agents' | 'models' | 'alerts' | 'timeline' | 'conversations' | 'vector'
+    ) => {
       setBusy(true);
       setNotice('');
 
@@ -397,6 +399,12 @@ export default function AdminObservabilityPage() {
               value={formatPercent(health.modules.storage.usedPercent)}
               hint={`${health.modules.storage.usedMegabytes} MB of ${health.modules.storage.quotaMegabytes} MB`}
               accent="emerald"
+            />
+            <MetricCard
+              label="Vector coverage"
+              value={formatPercent(analytics.vector?.coverage || 0)}
+              hint={`${analytics.vector?.missingEmbeddings || 0} missing embeddings`}
+              accent={(analytics.vector?.coverage || 0) >= 95 ? 'emerald' : 'orange'}
             />
           </div>
 

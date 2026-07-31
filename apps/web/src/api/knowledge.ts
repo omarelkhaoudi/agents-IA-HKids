@@ -9,6 +9,9 @@ import type {
   KnowledgeLink,
   KnowledgeTag,
   KnowledgeVersion,
+  VectorIndexAction,
+  VectorIndexJob,
+  VectorKnowledgeStats,
 } from '../types/knowledge-base';
 
 export async function getKnowledgeBootstrap(): Promise<KnowledgeBootstrap> {
@@ -21,6 +24,74 @@ export async function getKnowledgeDashboard(): Promise<KnowledgeDashboard> {
 
 export async function getKnowledgeAnalytics(): Promise<KnowledgeAnalytics> {
   return apiRequest('/api/knowledge/analytics');
+}
+
+export async function getKnowledgeVectorStats(): Promise<VectorKnowledgeStats> {
+  return apiRequest('/api/knowledge/vector/stats');
+}
+
+export async function getKnowledgeIndexJobs(
+  params: { status?: string; limit?: number } = {}
+): Promise<{ items: VectorIndexJob[] }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+  return apiRequest(`/api/knowledge/index/jobs?${query.toString()}`);
+}
+
+export async function reindexKnowledge(payload: VectorIndexAction = {}): Promise<VectorIndexJob> {
+  return apiRequest('/api/knowledge/index/reindex', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reindexKnowledgeDocument(
+  documentId: string,
+  payload: VectorIndexAction = {}
+): Promise<VectorIndexJob> {
+  return apiRequest(`/api/knowledge/documents/${encodeURIComponent(documentId)}/reindex`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reindexKnowledgeCollection(
+  collectionId: string,
+  payload: VectorIndexAction = {}
+): Promise<VectorIndexJob> {
+  return apiRequest(`/api/knowledge/collections/${encodeURIComponent(collectionId)}/reindex`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function retryFailedKnowledgeIndexJobs(
+  payload: VectorIndexAction = {}
+): Promise<{ items: VectorIndexJob[]; retried: number }> {
+  return apiRequest('/api/knowledge/index/jobs/retry-failed', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelKnowledgeIndexJob(jobId: string): Promise<VectorIndexJob> {
+  return apiRequest(`/api/knowledge/index/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function clearKnowledgeVectorCache(): Promise<{
+  cleared: { retrievalCacheEntries: number; vectorIndexEntries: number; embeddingCacheEntries: number };
+}> {
+  return apiRequest('/api/knowledge/vector/cache/clear', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function searchKnowledge(params: Record<string, string | number | undefined>) {

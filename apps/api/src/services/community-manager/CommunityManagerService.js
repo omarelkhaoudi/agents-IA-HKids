@@ -159,7 +159,13 @@ export class CommunityManagerService {
   async generateContent(payload = {}, userId) {
     const guidelines = (await this.repository.getBrandGuidelines()) || DEFAULT_GUIDELINES;
     const instruction = payload.instruction || payload.title || 'Prepare a H-Kids social post draft.';
-    const retrieval = this.retrievalService.retrieveRelevantContext(instruction);
+    const retrieval = this.retrievalService.retrieveRelevantContextAsync
+      ? await this.retrievalService.retrieveRelevantContextAsync(instruction, {
+          agentCode: 'community-manager',
+          promptId: payload.promptId,
+          promptAwareText: payload.theme || payload.objective || '',
+        })
+      : this.retrievalService.retrieveRelevantContext(instruction);
     const hashtags = this.suggestHashtags(payload);
     const cmPrompts = this.listPrompts().filter(
       (prompt) =>

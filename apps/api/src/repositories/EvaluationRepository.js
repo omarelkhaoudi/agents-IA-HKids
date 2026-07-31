@@ -863,7 +863,16 @@ export class EvaluationRepository {
     const staleBefore = new Date(Date.now() - Math.max(Number(staleDays) || 90, 1) * 86400000);
     const rowLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
 
-    const [totals, mostUseful, unused, stale, collections] = await Promise.all([
+    const [
+      totals,
+      mostUseful,
+      unused,
+      stale,
+      collections,
+      vectorTotals,
+      retrievalEvents,
+      failedIndexing,
+    ] = await Promise.all([
       this.pool.query(
         `
           SELECT
@@ -923,10 +932,47 @@ export class EvaluationRepository {
           ORDER BY COUNT(d.id) DESC
         `
       ),
+      this.pool.query(
+        `
+          SELECT
+            (SELECT COUNT(*)::int FROM knowledge_vector_chunks) AS chunks,
+            (SELECT COALESCE(AVG(token_count), 0) FROM knowledge_vector_chunks) AS average_chunk_tokens,
+            (SELECT COUNT(*)::int FROM knowledge_vector_embeddings WHERE status = 'ready') AS embeddings,
+            (
+              SELECT COUNT(*)::int
+              FROM knowledge_vector_chunks c
+              LEFT JOIN knowledge_vector_embeddings e
+                ON e.chunk_id = c.id AND e.status = 'ready'
+              WHERE e.chunk_id IS NULL
+            ) AS missing_embeddings
+        `
+      ),
+      this.pool.query(
+        `
+          SELECT status, cache_hit, latency_ms, semantic_top_score, retrieved_chunk_count, metadata
+          FROM knowledge_retrieval_events
+          ORDER BY created_at DESC
+          LIMIT 500
+        `
+      ),
+      this.pool.query(
+        `
+          SELECT COUNT(*)::int AS failed
+          FROM knowledge_documents
+          WHERE processing_status = 'failed' OR embedding_status = 'failed'
+        `
+      ),
     ]);
 
     const totalsRow = totals.rows[0] || {};
     const totalDocuments = totalsRow.total_documents || 0;
+    const vectorRow = vectorTotals.rows[0] || {};
+    const retrievalRows = retrievalEvents.rows || [];
+    const retrievalSuccessRows = retrievalRows.filter((row) => row.status === 'success');
+    const retrievalFailureRows = retrievalRows.filter((row) => row.status === 'failed');
+    const retrievalWithCitations = retrievalRows.filter((row) => Number(row.retrieved_chunk_count) > 0);
+    const embeddings = toNumber(vectorRow.embeddings);
+    const chunks = toNumber(vectorRow.chunks);
 
     return {
       totalDocuments,
@@ -949,6 +995,40 @@ export class EvaluationRepository {
         retrievals: row.retrievals || 0,
         averageQuality: round(row.average_quality),
       })),
+      vector: {
+        chunks,
+        embeddings,
+        averageChunkTokens: round(vectorRow.average_chunk_tokens),
+        coveragePercent: chunks ? round((embeddings / chunks) * 100) : 0,
+        missingEmbeddings: toNumber(vectorRow.missing_embeddings),
+        failedIndexing: failedIndexing.rows[0]?.failed || 0,
+        retrievalSamples: retrievalRows.length,
+        retrievalPrecision: retrievalRows.length
+          ? round((retrievalWithCitations.length / retrievalRows.length) * 100)
+          : 0,
+        retrievalSuccessRate: retrievalRows.length
+          ? round((retrievalSuccessRows.length / retrievalRows.length) * 100)
+          : 0,
+        retrievalFailures: retrievalFailureRows.length,
+        averageRetrievalLatencyMs: retrievalRows.length
+          ? Math.round(
+              retrievalRows.reduce((sum, row) => sum + toNumber(row.latency_ms), 0) /
+                retrievalRows.length
+            )
+          : 0,
+        semanticRelevance: retrievalRows.length
+          ? round(
+              (retrievalRows.reduce((sum, row) => sum + toNumber(row.semantic_top_score), 0) /
+                retrievalRows.length) *
+                100
+            )
+          : 0,
+        cacheHitRatio: retrievalRows.length
+          ? round(
+              (retrievalRows.filter((row) => row.cache_hit).length / retrievalRows.length) * 100
+            )
+          : 0,
+      },
     };
   }
 

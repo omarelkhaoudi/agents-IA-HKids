@@ -4,7 +4,9 @@ import {
   getDmsBootstrap,
   getDmsDocumentDetail,
   getDmsFolderBreadcrumb,
+  getDmsVectorStats,
   moveDmsDocuments,
+  reindexDmsDocument,
   runDmsWorkflow,
   startDmsUploadSession,
   uploadDmsDocument,
@@ -14,6 +16,8 @@ import Button from '../components/ui/Button';
 import MetricCard from '../components/ui/MetricCard';
 import Panel from '../components/ui/Panel';
 import Skeleton from '../components/ui/Skeleton';
+import VectorKnowledgeHealthPanel from '../components/knowledge-base/VectorKnowledgeHealthPanel';
+import type { VectorKnowledgeStats } from '../types/knowledge-base';
 
 const sections = [
   { id: 'home', label: 'Document Home' },
@@ -40,9 +44,11 @@ function fileToBase64(file: File) {
 export default function DocumentsPage() {
   const [section, setSection] = useState('home');
   const [bootstrap, setBootstrap] = useState<any>(null);
+  const [vectorStats, setVectorStats] = useState<VectorKnowledgeStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<any[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -58,8 +64,12 @@ export default function DocumentsPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await getDmsBootstrap();
+      const [data, stats] = await Promise.all([
+        getDmsBootstrap(),
+        getDmsVectorStats().catch(() => null),
+      ]);
       setBootstrap(data);
+      setVectorStats(stats);
       setSelectedDocumentId((current) => current || data.documents[0]?.id || null);
     } catch {
       setError('Unable to load the document management system. Please make sure the API is running.');
@@ -213,6 +223,23 @@ export default function DocumentsPage() {
     setBusy(false);
   };
 
+  const refreshVectorStats = async () => {
+    setVectorStats(await getDmsVectorStats().catch(() => null));
+  };
+
+  const handleReindexSelected = async () => {
+    if (!selectedDocumentId) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      await reindexDmsDocument(selectedDocumentId, { force: true, background: true });
+      setNotice('Vector re-index queued for the selected document.');
+      await refreshVectorStats();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)_320px]">
@@ -277,6 +304,10 @@ export default function DocumentsPage() {
             <Panel className="p-10 text-center text-sm text-rose-300">{error}</Panel>
           ) : (
             <>
+              {notice ? (
+                <Panel className="border-cyan-400/20 p-4 text-sm text-cyan-200">{notice}</Panel>
+              ) : null}
+
               {section === 'home' && dashboard ? (
                 <div className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -301,6 +332,12 @@ export default function DocumentsPage() {
                       accent="cyan"
                     />
                   </div>
+                  <VectorKnowledgeHealthPanel
+                    stats={vectorStats}
+                    busy={busy}
+                    selectedDocumentTitle={detail?.document?.title}
+                    onReindexSelected={() => void handleReindexSelected()}
+                  />
                 </div>
               ) : null}
 
@@ -599,6 +636,13 @@ export default function DocumentsPage() {
                         }}
                       >
                         Move to current folder
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => void handleReindexSelected()}
+                      >
+                        Re-index for AI
                       </Button>
                     </div>
                   </Panel>

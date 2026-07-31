@@ -1,5 +1,6 @@
 import { applyRuntimeSecretsToEnv } from './services/setup/InstallationService.js';
 import { assertProductionConfig } from './config/env.js';
+import { retrievalService } from './runtime/assistant-runtime.js';
 import { initializeAuthRuntime } from './runtime/auth-runtime.js';
 import { initializeContentRuntime } from './runtime/content-runtime.js';
 import { initializeAdminRuntime } from './runtime/admin-runtime.js';
@@ -21,6 +22,7 @@ logger.info('startup_begin', { nodeEnv: process.env.NODE_ENV || 'development' })
 
 await initializeAuthRuntime();
 await initializeContentRuntime();
+retrievalService.scheduleRefreshIndex(0, { actor: 'startup', scope: 'all' });
 await workflowEngine.initialize();
 await initializeAdminRuntime();
 await initializeSetupRuntime();

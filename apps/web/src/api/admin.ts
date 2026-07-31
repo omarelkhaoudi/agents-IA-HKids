@@ -6,6 +6,7 @@ import type {
   AdminSettings,
   SystemStatus,
 } from '../types/admin';
+import type { VectorIndexAction, VectorIndexJob, VectorKnowledgeStats } from '../types/knowledge-base';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
@@ -19,6 +20,54 @@ export async function getAdminStatistics(): Promise<AdminDashboardData> {
 
 export async function getSystemStatus(): Promise<SystemStatus> {
   return apiRequest('/api/admin/system-status');
+}
+
+export async function getAdminVectorStats(): Promise<VectorKnowledgeStats> {
+  return apiRequest('/api/admin/vector/stats');
+}
+
+export async function getAdminVectorJobs(
+  params: { status?: string; limit?: number } = {}
+): Promise<{ items: VectorIndexJob[] }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+  return apiRequest(`/api/admin/vector/jobs?${query.toString()}`);
+}
+
+export async function reindexAdminVector(payload: VectorIndexAction = {}): Promise<VectorIndexJob> {
+  return apiRequest('/api/admin/vector/reindex', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function retryFailedAdminVectorJobs(
+  payload: VectorIndexAction = {}
+): Promise<{ items: VectorIndexJob[]; retried: number }> {
+  return apiRequest('/api/admin/vector/jobs/retry-failed', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelAdminVectorJob(jobId: string): Promise<VectorIndexJob> {
+  return apiRequest(`/api/admin/vector/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function clearAdminVectorCache(): Promise<{
+  cleared: { retrievalCacheEntries: number; vectorIndexEntries: number; embeddingCacheEntries: number };
+}> {
+  return apiRequest('/api/admin/vector/cache/clear', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function downloadAdminExport(

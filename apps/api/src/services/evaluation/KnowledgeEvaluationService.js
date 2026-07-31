@@ -147,8 +147,26 @@ export class KnowledgeEvaluationService {
       averageCompleteness: corpus.averageCompleteness,
       documentsInReview: corpus.documentsInReview,
       coveragePercent: corpus.coveragePercent,
+      vectorCoveragePercent: corpus.vector?.coveragePercent || 0,
+      retrievalPrecision: corpus.vector?.retrievalPrecision || 0,
+      citationAccuracy: corpus.vector?.retrievalPrecision || 0,
+      groundedness: runs.length
+        ? round(runs.reduce((sum, run) => sum + toNumber(run.groundedness_score), 0) / runs.length)
+        : 0,
+      hallucinationReduction: runs.length
+        ? round(100 - runs.reduce((sum, run) => sum + toNumber(run.hallucination_risk), 0) / runs.length)
+        : 0,
+      knowledgeEffectiveness: round(
+        ((corpus.vector?.coveragePercent || 0) +
+          (corpus.vector?.retrievalPrecision || retrievalSuccessRate) +
+          retrievalSuccessRate) /
+          3
+      ),
+      semanticRelevance: corpus.vector?.semanticRelevance || 0,
+      missingKnowledge: (corpus.vector?.missingEmbeddings || 0) + (corpus.unused?.length || 0),
       retrievalSuccessRate,
       retrievalFailures,
+      vectorHealth: corpus.vector || {},
       freshness: {
         staleDays: this.staleDays,
         staleDocuments: corpus.stale.length,
@@ -204,6 +222,30 @@ export class KnowledgeEvaluationService {
         code: 'review_backlog',
         title: 'Review backlog',
         detail: `${corpus.documentsInReview} documents are waiting for review.`,
+      });
+    }
+
+    if ((corpus.vector?.missingEmbeddings || 0) > 0) {
+      gaps.push({
+        code: 'missing_embeddings',
+        title: 'Embeddings are missing',
+        detail: `${corpus.vector.missingEmbeddings} chunks do not have ready embeddings.`,
+      });
+    }
+
+    if ((corpus.vector?.failedIndexing || 0) > 0) {
+      gaps.push({
+        code: 'failed_indexing',
+        title: 'Indexing failures',
+        detail: `${corpus.vector.failedIndexing} documents failed vector indexing.`,
+      });
+    }
+
+    if ((corpus.vector?.retrievalSamples || 0) > 0 && (corpus.vector?.semanticRelevance || 0) < 40) {
+      gaps.push({
+        code: 'low_semantic_relevance',
+        title: 'Semantic relevance is weak',
+        detail: `Average top semantic relevance is ${corpus.vector.semanticRelevance}%.`,
       });
     }
 
