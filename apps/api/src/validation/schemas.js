@@ -509,6 +509,105 @@ export const observabilityAlertActionBodySchema = z.object({
   actor: z.string().trim().max(160).optional(),
 });
 
+export const evaluationWindowQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const evaluationTrendQuerySchema = z.object({
+  granularity: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const evaluationAnalyticsQuerySchema = z.object({
+  granularity: z.enum(['daily', 'weekly', 'monthly']).default('weekly'),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const evaluationHistoryQuerySchema = z.object({
+  agentCode: z.string().trim().max(120).optional(),
+  promptId: z.string().trim().max(200).optional(),
+  conversationId: z.string().trim().max(200).optional(),
+  subjectType: z.enum(['conversation', 'suite_case', 'prompt', 'document', 'workflow']).optional(),
+  verdict: z.enum(['pass', 'warn', 'fail']).optional(),
+  source: z.enum(['automatic', 'suite', 'manual']).optional(),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const evaluationPromptsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const evaluationComparisonQuerySchema = z.object({
+  left: z.coerce.number().int().min(1).optional(),
+  right: z.coerce.number().int().min(1).optional(),
+});
+
+export const evaluationSuitesQuerySchema = z.object({
+  agentCode: z.string().trim().max(120).optional(),
+  status: z.enum(['active', 'draft', 'archived']).optional(),
+});
+
+export const evaluationAlertsQuerySchema = z.object({
+  status: z.enum(['open', 'acknowledged', 'resolved']).optional(),
+  severity: z.enum(['info', 'warning', 'critical']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const evaluationSuggestionsQuerySchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  category: z.enum(['prompt', 'knowledge', 'workflow', 'agent']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const evaluationExportQuerySchema = z.object({
+  dataset: z
+    .enum(['runs', 'agents', 'prompts', 'criteria', 'trend', 'suggestions'])
+    .default('runs'),
+  format: z.enum(['json', 'csv']).default('json'),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const evaluationActionBodySchema = z.object({
+  actor: z.string().trim().max(160).optional(),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const evaluationSuggestionActionBodySchema = z.object({
+  actor: z.string().trim().max(160).optional(),
+  status: z.enum(['approved', 'rejected']),
+});
+
+export const evaluationRunBodySchema = z.object({
+  subjectType: z
+    .enum(['conversation', 'suite_case', 'prompt', 'document', 'workflow'])
+    .default('conversation'),
+  subjectId: z.string().trim().max(200).optional(),
+  agentCode: z.string().trim().max(120).optional(),
+  conversationId: z.string().trim().max(200).optional(),
+  messageId: z.string().trim().max(200).optional(),
+  promptId: z.string().trim().max(200).optional(),
+  promptVersion: z.coerce.number().int().min(0).optional(),
+  documentIds: z.array(z.string().trim().max(200)).max(50).optional(),
+  provider: z.string().trim().max(60).optional(),
+  model: z.string().trim().max(120).optional(),
+  question: z.string().trim().max(8000).optional(),
+  outputText: z.string().max(60_000),
+  knowledgeText: z.string().max(60_000).optional(),
+  expectedOutput: z.string().max(20_000).optional(),
+  instructions: z.array(z.string().trim().max(1000)).max(50).optional(),
+  approvalState: z.enum(['approved', 'rejected', 'pending', 'unknown']).default('unknown'),
+  feedbackRating: z.coerce.number().min(1).max(5).optional(),
+  latencyMs: z.coerce.number().int().min(0).max(3_600_000).optional(),
+  promptTokens: z.coerce.number().int().min(0).optional(),
+  completionTokens: z.coerce.number().int().min(0).optional(),
+  totalTokens: z.coerce.number().int().min(0).optional(),
+  estimatedCost: z.coerce.number().min(0).optional(),
+  metadata: z.record(z.any()).default({}),
+});
+
 const cmPlatformSchema = z.enum([
   'facebook',
   'instagram',

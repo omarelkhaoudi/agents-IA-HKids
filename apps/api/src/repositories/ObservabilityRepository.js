@@ -920,12 +920,31 @@ export class ObservabilityRepository {
     return result.rows[0];
   }
 
-  async autoResolveAlerts(activeKeys = [], actor = 'system') {
+  /**
+   * Resolves alerts that are no longer firing. `keyPrefix` and `excludePrefix`
+   * scope the sweep so independent rule engines writing to this table never
+   * resolve each other's alerts.
+   */
+  async autoResolveAlerts(activeKeys = [], actor = 'system', { keyPrefix, excludePrefix } = {}) {
     const result = await this.pool.query(
       `SELECT id, alert_key FROM observability_alerts WHERE status <> 'resolved'`
     );
 
-    const stale = result.rows.filter((row) => !activeKeys.includes(row.alert_key));
+    const stale = result.rows.filter((row) => {
+      if (activeKeys.includes(row.alert_key)) {
+        return false;
+      }
+
+      if (keyPrefix && !row.alert_key.startsWith(keyPrefix)) {
+        return false;
+      }
+
+      if (excludePrefix && row.alert_key.startsWith(excludePrefix)) {
+        return false;
+      }
+
+      return true;
+    });
 
     for (const row of stale) {
       await this.pool.query(
@@ -941,7 +960,7 @@ export class ObservabilityRepository {
     return stale.length;
   }
 
-  async listAlerts({ status, severity, limit = 50 } = {}) {
+  async listAlerts({ status, severity, category, keyPrefix, limit = 50 } = {}) {
     const filters = [];
     const values = [];
 
@@ -953,6 +972,16 @@ export class ObservabilityRepository {
     if (severity) {
       values.push(severity);
       filters.push(`severity = $${values.length}`);
+    }
+
+    if (category) {
+      values.push(category);
+      filters.push(`category = $${values.length}`);
+    }
+
+    if (keyPrefix) {
+      values.push(`${keyPrefix}%`);
+      filters.push(`alert_key LIKE $${values.length}`);
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -999,7 +1028,15 @@ export class ObservabilityRepository {
     return result.rows[0] || null;
   }
 
-  async getAlertCounts() {
+  async getAlertCounts({ keyPrefix } = {}) {
+    const values = [];
+    let whereClause = '';
+
+    if (keyPrefix) {
+      values.push(`${keyPrefix}%`);
+      whereClause = `WHERE alert_key LIKE $${values.length}`;
+    }
+
     const result = await this.pool.query(
       `
         SELECT
@@ -1008,7 +1045,9 @@ export class ObservabilityRepository {
           COALESCE(SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END), 0)::int AS resolved,
           COALESCE(SUM(CASE WHEN status <> 'resolved' AND severity = 'critical' THEN 1 ELSE 0 END), 0)::int AS critical
         FROM observability_alerts
-      `
+        ${whereClause}
+      `,
+      values
     );
 
     const row = result.rows[0] || {};

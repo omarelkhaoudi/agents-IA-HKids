@@ -185,6 +185,14 @@ export default function AppShell() {
             />
           ) : null}
           {isManager ? (
+            <NavItem
+              to="/administration/evaluation"
+              label="AI Evaluation"
+              icon="◈"
+              collapsed={collapsed}
+            />
+          ) : null}
+          {isManager ? (
             <NavItem to="/administration" label="Administration" icon="⚙" collapsed={collapsed} />
           ) : null}
           {isManager ? (

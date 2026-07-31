@@ -6,6 +6,7 @@ import AdministrativeAssistantPage from './pages/AdministrativeAssistantPage';
 import AiAdministrationPage from './pages/AiAdministrationPage';
 import AdministrationLayout from './pages/administration/AdministrationLayout';
 import AdminAgentsPage from './pages/administration/AdminAgentsPage';
+import AdminAiEvaluationPage from './pages/administration/AdminAiEvaluationPage';
 import AdminDashboardPage from './pages/administration/AdminDashboardPage';
 import AdminExportsPage from './pages/administration/AdminExportsPage';
 import AdminObservabilityPage from './pages/administration/AdminObservabilityPage';
@@ -85,6 +86,7 @@ export default function App() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboardPage />} />
               <Route path="observability" element={<AdminObservabilityPage />} />
+              <Route path="evaluation" element={<AdminAiEvaluationPage />} />
               <Route path="system-status" element={<AdminSystemStatusPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
               <Route path="agents" element={<AdminAgentsPage />} />

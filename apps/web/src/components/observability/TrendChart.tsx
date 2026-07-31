@@ -12,6 +12,9 @@ interface TrendChartProps {
   emptyLabel?: string;
   accent?: 'cyan' | 'violet' | 'emerald';
   height?: number;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  maxValue?: number;
 }
 
 const accentClasses = {
@@ -25,8 +28,11 @@ export default function TrendChart({
   emptyLabel = 'No activity recorded for this period.',
   accent = 'cyan',
   height = 180,
+  primaryLabel = 'Volume',
+  secondaryLabel = 'Failures',
+  maxValue,
 }: TrendChartProps) {
-  const maximum = points.reduce((max, point) => Math.max(max, point.value), 0);
+  const maximum = maxValue ?? points.reduce((max, point) => Math.max(max, point.value), 0);
 
   if (points.length === 0) {
     return <p className="py-10 text-center text-sm text-slate-400">{emptyLabel}</p>;
@@ -77,11 +83,11 @@ export default function TrendChart({
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-2">
           <span className={['h-2 w-4 rounded-full', accentClasses[accent]].join(' ')} />
-          Volume
+          {primaryLabel}
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="h-2 w-4 rounded-full bg-rose-400/70" />
-          Failures
+          {secondaryLabel}
         </span>
         <span>Peak {formatNumber(maximum)}</span>
       </div>

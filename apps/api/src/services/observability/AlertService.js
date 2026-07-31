@@ -2,6 +2,10 @@ import { env } from '../../config/env.js';
 
 const MINIMUM_LATENCY_SAMPLE = 3;
 
+// Evaluation alerts share this table but are owned by the evaluation rule
+// engine, so this service must not resolve them during its own sweep.
+const EVALUATION_ALERT_PREFIX = 'evaluation:';
+
 function round(value, decimals = 2) {
   const factor = 10 ** decimals;
   return Math.round(Number(value || 0) * factor) / factor;
@@ -180,7 +184,8 @@ export class AlertService {
 
     const resolved = await this.observabilityRepository.autoResolveAlerts(
       candidates.map((candidate) => candidate.alertKey),
-      actor
+      actor,
+      { excludePrefix: EVALUATION_ALERT_PREFIX }
     );
 
     return {

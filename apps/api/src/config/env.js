@@ -81,6 +81,16 @@ export const env = {
   alertPendingApprovals: Number(process.env.ALERT_PENDING_APPROVALS || 25),
   alertFailedWorkflows: Number(process.env.ALERT_FAILED_WORKFLOWS || 5),
   alertRetrievalFailures: Number(process.env.ALERT_RETRIEVAL_FAILURES || 3),
+  evaluationEnabled: process.env.EVALUATION_ENABLED !== 'false',
+  evaluationStaleKnowledgeDays: Number(process.env.EVALUATION_STALE_KNOWLEDGE_DAYS || 90),
+  evaluationRegressionDropPercent: Number(process.env.EVALUATION_REGRESSION_DROP_PERCENT || 8),
+  evaluationMinQualityScore: Number(process.env.EVALUATION_MIN_QUALITY_SCORE || 70),
+  evaluationQualityDropPercent: Number(process.env.EVALUATION_QUALITY_DROP_PERCENT || 10),
+  evaluationMinApprovalRate: Number(process.env.EVALUATION_MIN_APPROVAL_RATE || 60),
+  evaluationMaxHallucinationRisk: Number(process.env.EVALUATION_MAX_HALLUCINATION_RISK || 45),
+  evaluationMaxFailureRate: Number(process.env.EVALUATION_MAX_FAILURE_RATE || 20),
+  evaluationMaxStaleDocuments: Number(process.env.EVALUATION_MAX_STALE_DOCUMENTS || 10),
+  evaluationMaxDailyCost: Number(process.env.EVALUATION_MAX_DAILY_COST || 25),
 };
 
 export function assertProductionConfig() {

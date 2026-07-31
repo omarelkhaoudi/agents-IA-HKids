@@ -3,6 +3,7 @@ import { hasMinimumRole, isWriteMethod, ROLES } from '../constants/roles.js';
 const ADMIN_PREFIX = '/admin';
 const AI_PREFIX = '/ai';
 const OBSERVABILITY_PREFIX = '/observability';
+const EVALUATION_PREFIX = '/evaluation';
 const FEEDBACK_PREFIX = '/feedback';
 const WORKFLOW_SUFFIX = '/workflow';
 const DOCUMENTS_PREFIX = '/documents';
@@ -65,6 +66,27 @@ export function authorizeAccess(request, response, next) {
     }
 
     if (writeRequest && !hasMinimumRole(role, ROLES.ADMINISTRATOR)) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  // Managers act as evaluators: they may run suites, evaluate alert rules and
+  // generate suggestions. Only administrators may act on governance decisions.
+  if (path.startsWith(EVALUATION_PREFIX)) {
+    if (!hasMinimumRole(role, ROLES.MANAGER)) {
+      deny(response);
+      return;
+    }
+
+    if (
+      writeRequest &&
+      (path.includes('/review') || path.includes('/acknowledge') || path.includes('/resolve')) &&
+      !hasMinimumRole(role, ROLES.ADMINISTRATOR)
+    ) {
       deny(response);
       return;
     }
