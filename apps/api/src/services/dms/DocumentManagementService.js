@@ -64,6 +64,7 @@ export class DocumentManagementService {
     this.refreshCaches = options.refreshCaches || (async () => {});
     this.scheduleRefreshIndex = options.scheduleRefreshIndex || (() => {});
     this.documentAclService = options.documentAclService || null;
+    this.workflowEngine = options.workflowEngine || null;
     const infra = createDmsInfrastructure(options.infrastructure || {});
     this.storage = infra.storage;
     this.ocr = infra.ocr;
@@ -554,6 +555,99 @@ export class DocumentManagementService {
     return results;
   }
 
+  async ensureWorkflow(document, actor = '') {
+    if (!this.workflowEngine || !document?.id) {
+      return null;
+    }
+
+    return this.workflowEngine.createGovernedWorkflow({
+      subjectType: 'dms_document',
+      subjectId: document.id,
+      workflowDefinitionCode: 'document-review',
+      policyCode: 'administration-policy',
+      agentCode: 'enterprise-dms',
+      priority: document.securityClassification === 'restricted' ? 'high' : 'normal',
+      reviewers: ['Manager'],
+      actor: actor || document.owner || 'enterprise-dms',
+      source: 'enterprise_dms',
+      metadata: {
+        title: document.title,
+        folderId: document.folderId,
+        securityClassification: document.securityClassification,
+        aclVisibility: document.aclVisibility,
+        requiresHumanApproval: true,
+      },
+    });
+  }
+
+  async governTransition(existing, action, actor = '', comment = '') {
+    if (!this.workflowEngine || !existing?.id) {
+      return;
+    }
+
+    await this.ensureWorkflow(existing, actor);
+
+    if (action === 'submit') {
+      await this.workflowEngine.submitGovernedSubject(
+        'dms_document',
+        existing.id,
+        actor || 'enterprise-dms',
+        comment || 'DMS document submitted for review.'
+      );
+      return;
+    }
+
+    if (action === 'approve') {
+      const workflow = await this.workflowEngine.approveGovernedSubject(
+        'dms_document',
+        existing.id,
+        actor || 'enterprise-dms',
+        comment || 'DMS document approved.'
+      );
+      if (workflow.currentState !== 'Approved') {
+        const error = new Error('Additional workflow approvals are required before approving this document.');
+        error.statusCode = 409;
+        throw error;
+      }
+      return;
+    }
+
+    if (action === 'publish') {
+      let workflow = await this.workflowEngine.getWorkflowBySubject('dms_document', existing.id);
+      if (!['Approved', 'Exported'].includes(workflow?.currentState)) {
+        workflow = await this.workflowEngine.approveGovernedSubject(
+          'dms_document',
+          existing.id,
+          actor || 'enterprise-dms',
+          comment || 'DMS document approved for publication.'
+        );
+      }
+      if (workflow.currentState === 'Approved') {
+        workflow = await this.workflowEngine.exportGovernedSubject(
+          'dms_document',
+          existing.id,
+          actor || 'enterprise-dms',
+          comment || 'DMS document published.'
+        );
+      }
+      if (workflow.currentState !== 'Exported') {
+        const error = new Error('Workflow approval is required before publishing this document.');
+        error.statusCode = 409;
+        throw error;
+      }
+      return;
+    }
+
+    if (action === 'corrections') {
+      await this.workflowEngine.rejectGovernedSubject(
+        'dms_document',
+        existing.id,
+        actor || 'enterprise-dms',
+        comment || 'DMS document corrections requested.'
+      );
+    }
+  }
+
   async transitionDocument(documentId, action, actor = '', comment = '', context = {}) {
     const existing = await this.documentRepository.getById(documentId);
     if (!existing) return null;
@@ -578,22 +672,33 @@ export class DocumentManagementService {
       throw error;
     }
 
+    await this.governTransition(existing, action, actor, comment);
+
     if (this.knowledgePlatform) {
       try {
         if (action === 'submit') {
-          await this.knowledgePlatform.submitForReview(documentId, actor, comment);
+          await this.knowledgePlatform.submitForReview(documentId, actor, comment, {
+            skipWorkflow: true,
+          });
         } else if (action === 'publish') {
-          await this.knowledgePlatform.publishDocument(documentId, actor, comment);
+          await this.knowledgePlatform.publishDocument(documentId, actor, comment, {
+            skipWorkflow: true,
+          });
         } else if (action === 'corrections') {
-          await this.knowledgePlatform.requestCorrections(documentId, actor, comment);
+          await this.knowledgePlatform.requestCorrections(documentId, actor, comment, {
+            skipWorkflow: true,
+          });
         } else if (action === 'archive') {
-          await this.knowledgePlatform.archiveDocument(documentId, actor, comment);
+          await this.knowledgePlatform.archiveDocument(documentId, actor, comment, {
+            skipWorkflow: true,
+          });
         } else {
           await this.knowledgePlatform.transitionStatus(
             documentId,
             nextStatus,
             actor,
-            comment || action
+            comment || action,
+            { skipWorkflow: true }
           );
         }
       } catch {

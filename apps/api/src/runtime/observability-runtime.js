@@ -10,6 +10,7 @@ import { aiGateway, persistenceService, retrievalService } from './assistant-run
 import { healthService } from './health-runtime.js';
 import { logger } from '../utils/logger.js';
 import { securityAuditService, securityDashboardService } from './security-runtime.js';
+import { workflowEngine } from './workflow-runtime.js';
 
 const observabilityRepository = new ObservabilityRepository(persistenceService.pool);
 
@@ -39,6 +40,8 @@ export const observabilityService = new ObservabilityService({
 
 securityAuditService.setObservabilityService(observabilityService);
 securityDashboardService.setAlertService(alertService);
+workflowEngine.setObservabilityService(observabilityService);
+workflowEngine.setAuditService(securityAuditService);
 
 const instrumentationBridge = new InstrumentationBridge({ observabilityService });
 

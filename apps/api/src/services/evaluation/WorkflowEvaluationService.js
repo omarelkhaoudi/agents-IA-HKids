@@ -12,8 +12,9 @@ const FAILED_STATES = new Set(['Rejected']);
  * engine already recorded.
  */
 export class WorkflowEvaluationService {
-  constructor({ evaluationRepository }) {
+  constructor({ evaluationRepository, workflowEngine = null }) {
     this.evaluationRepository = evaluationRepository;
+    this.workflowEngine = workflowEngine;
   }
 
   async getWorkflowQuality({ days = 30 } = {}) {
@@ -30,6 +31,10 @@ export class WorkflowEvaluationService {
       .reduce((total, entry) => total + entry.total, 0);
 
     const decided = data.transitions.approved + data.transitions.rejected;
+
+    const governance = this.workflowEngine?.getEvaluationMetrics
+      ? await this.workflowEngine.getEvaluationMetrics()
+      : {};
 
     return {
       windowDays,
@@ -49,6 +54,16 @@ export class WorkflowEvaluationService {
         ? round((data.approvedDocuments / data.totalDocuments) * 100)
         : 0,
       states: data.states,
+      workflowQualityScore: governance.workflowQualityScore ?? 0,
+      approvalEfficiency: governance.approvalEfficiency ?? 0,
+      slaScore: governance.slaScore ?? 0,
+      governanceScore: governance.governanceScore ?? 0,
+      escalationScore: governance.escalationScore ?? 0,
+      delegationScore: governance.delegationScore ?? 0,
+      approvalReliability: governance.approvalReliability ?? 0,
+      workflowComplexity: governance.workflowComplexity ?? 0,
+      workflowStability: governance.workflowStability ?? 0,
+      governance,
     };
   }
 }

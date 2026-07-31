@@ -81,12 +81,13 @@ function slugify(value) {
 }
 
 export class HrAgentService {
-  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts }) {
+  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts, workflowEngine = null }) {
     this.repository = repository;
     this.aiGateway = aiGateway;
     this.retrievalService = retrievalService;
     this.listDocuments = listDocuments;
     this.listPrompts = listPrompts;
+    this.workflowEngine = workflowEngine;
   }
 
   async initialize() {
@@ -127,6 +128,27 @@ export class HrAgentService {
           .toLowerCase()
           .includes('performance')
     );
+  }
+
+  ensureWorkflow(subjectType, subjectId, actor = 'hr-agent', options = {}) {
+    const template =
+      subjectType === 'hr_job_description'
+        ? 'recruitment'
+        : subjectType === 'hr_leave_request'
+          ? 'hr-request'
+          : 'hr-request';
+    return this.workflowEngine?.createGovernedWorkflow({
+      subjectType,
+      subjectId,
+      agentCode: 'hr-agent',
+      workflowDefinitionCode: template,
+      policyCode: 'hr-policy',
+      reviewers: ['HR Manager', 'Administrator'],
+      actor,
+      source: 'hr-agent',
+      priority: options.priority || 'high',
+      metadata: { requiresHumanApproval: true, ...options.metadata },
+    });
   }
 
   filterHrKnowledge(documents = []) {
@@ -231,6 +253,10 @@ export class HrAgentService {
       },
     });
 
+    await this.ensureWorkflow('hr_document', document.id, userId || 'hr-agent', {
+      metadata: { documentType },
+    });
+
     return { document, retrieval, generation, parsed };
   }
 
@@ -318,6 +344,10 @@ export class HrAgentService {
       },
     });
 
+    await this.ensureWorkflow('hr_job_description', job.id, userId || 'hr-agent', {
+      metadata: { department: job.department },
+    });
+
     return { job, retrieval, generation, parsed };
   }
 
@@ -382,14 +412,32 @@ export class HrAgentService {
       },
     });
 
+    await this.ensureWorkflow('hr_leave_request', leave.id, userId || 'hr-agent', {
+      metadata: { leaveType: leave.leaveType, days: leave.days },
+    });
+
     return { leave, retrieval, generation, parsed };
   }
 
   async submitDocumentReview(id) {
+    await this.ensureWorkflow('hr_document', id);
+    await this.workflowEngine?.submitGovernedSubject(
+      'hr_document',
+      id,
+      'reviewer',
+      'HR document submitted for review.'
+    );
     return this.repository.updateDocument(id, { approvalStatus: 'pending_review' });
   }
 
   async approveDocument(id, actor = 'reviewer') {
+    await this.ensureWorkflow('hr_document', id, actor);
+    await this.workflowEngine?.approveGovernedSubject(
+      'hr_document',
+      id,
+      actor,
+      'HR document approved.'
+    );
     const existing = await this.repository.getDocument(id);
     return this.repository.updateDocument(id, {
       approvalStatus: 'approved',
@@ -400,6 +448,13 @@ export class HrAgentService {
   }
 
   async rejectDocument(id, actor = 'reviewer') {
+    await this.ensureWorkflow('hr_document', id, actor);
+    await this.workflowEngine?.rejectGovernedSubject(
+      'hr_document',
+      id,
+      actor,
+      'HR document rejected.'
+    );
     return this.repository.updateDocument(id, {
       approvalStatus: 'rejected',
       approvedBy: actor,
@@ -407,10 +462,24 @@ export class HrAgentService {
   }
 
   async submitJobReview(id) {
+    await this.ensureWorkflow('hr_job_description', id);
+    await this.workflowEngine?.submitGovernedSubject(
+      'hr_job_description',
+      id,
+      'reviewer',
+      'Job description submitted for review.'
+    );
     return this.repository.updateJobDescription(id, { approvalStatus: 'pending_review' });
   }
 
   async approveJob(id, actor = 'reviewer') {
+    await this.ensureWorkflow('hr_job_description', id, actor);
+    await this.workflowEngine?.approveGovernedSubject(
+      'hr_job_description',
+      id,
+      actor,
+      'Job description approved.'
+    );
     return this.repository.updateJobDescription(id, {
       approvalStatus: 'approved',
       approvedAt: new Date().toISOString(),
@@ -419,6 +488,13 @@ export class HrAgentService {
   }
 
   async rejectJob(id, actor = 'reviewer') {
+    await this.ensureWorkflow('hr_job_description', id, actor);
+    await this.workflowEngine?.rejectGovernedSubject(
+      'hr_job_description',
+      id,
+      actor,
+      'Job description rejected.'
+    );
     return this.repository.updateJobDescription(id, {
       approvalStatus: 'rejected',
       approvedBy: actor,
@@ -430,6 +506,22 @@ export class HrAgentService {
       throw Object.assign(new Error('Leave decision must be approved or rejected by a manager.'), {
         statusCode: 400,
       });
+    }
+    await this.ensureWorkflow('hr_leave_request', id, actor);
+    if (decision === 'approved') {
+      await this.workflowEngine?.approveGovernedSubject(
+        'hr_leave_request',
+        id,
+        actor,
+        'Leave request approved.'
+      );
+    } else {
+      await this.workflowEngine?.rejectGovernedSubject(
+        'hr_leave_request',
+        id,
+        actor,
+        'Leave request rejected.'
+      );
     }
     return this.repository.updateLeaveRequest(id, {
       status: decision,
@@ -449,6 +541,14 @@ export class HrAgentService {
         { statusCode: 409 }
       );
     }
+
+    await this.ensureWorkflow('hr_document', id, 'system');
+    await this.workflowEngine?.exportGovernedSubject(
+      'hr_document',
+      id,
+      'system',
+      `HR document exported as ${format}.`
+    );
 
     const markdown = [
       `# ${document.title}`,

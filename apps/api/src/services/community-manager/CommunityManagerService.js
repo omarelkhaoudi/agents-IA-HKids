@@ -77,12 +77,13 @@ function safeParseGeneratedContent(text) {
 }
 
 export class CommunityManagerService {
-  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts }) {
+  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts, workflowEngine = null }) {
     this.repository = repository;
     this.aiGateway = aiGateway;
     this.retrievalService = retrievalService;
     this.listDocuments = listDocuments;
     this.listPrompts = listPrompts;
+    this.workflowEngine = workflowEngine;
   }
 
   async initialize() {
@@ -137,6 +138,20 @@ export class CommunityManagerService {
         audience.toLowerCase().includes('école') ? '#Ecoles' : '#Parents',
       ].filter((value, index, array) => array.indexOf(value) === index),
     };
+  }
+
+  ensureWorkflowForPost(postId, actor = 'community-manager') {
+    return this.workflowEngine?.createGovernedWorkflow({
+      subjectType: 'community_post',
+      subjectId: postId,
+      agentCode: 'community-manager',
+      workflowDefinitionCode: 'content-approval',
+      policyCode: 'marketing-policy',
+      reviewers: ['Manager'],
+      actor,
+      source: 'community-manager',
+      metadata: { requiresHumanApproval: true },
+    });
   }
 
   buildSystemPrompt(guidelines, tone) {
@@ -235,14 +250,44 @@ export class CommunityManagerService {
       },
     });
 
+    await this.workflowEngine?.createGovernedWorkflow({
+      subjectType: 'community_post',
+      subjectId: post.id,
+      agentCode: 'community-manager',
+      workflowDefinitionCode: 'content-approval',
+      policyCode: 'marketing-policy',
+      reviewers: ['Manager'],
+      actor: userId || 'community-manager',
+      source: 'community-manager.generateContent',
+      metadata: {
+        title: post.title,
+        platform: post.platform,
+        requiresHumanApproval: true,
+      },
+    });
+
     return { post, hashtags, retrieval, generation };
   }
 
   async submitForReview(postId) {
+    await this.ensureWorkflowForPost(postId);
+    await this.workflowEngine?.submitGovernedSubject(
+      'community_post',
+      postId,
+      'reviewer',
+      'Content submitted for review.'
+    );
     return this.repository.updatePost(postId, { approvalStatus: 'pending_review' });
   }
 
   async approvePost(postId, actor = 'reviewer') {
+    await this.ensureWorkflowForPost(postId, actor);
+    await this.workflowEngine?.approveGovernedSubject(
+      'community_post',
+      postId,
+      actor,
+      'Community content approved.'
+    );
     const post = await this.repository.updatePost(postId, {
       approvalStatus: 'approved',
       approvedAt: new Date().toISOString(),
@@ -263,6 +308,13 @@ export class CommunityManagerService {
   }
 
   async rejectPost(postId, actor = 'reviewer') {
+    await this.ensureWorkflowForPost(postId, actor);
+    await this.workflowEngine?.rejectGovernedSubject(
+      'community_post',
+      postId,
+      actor,
+      'Community content rejected.'
+    );
     const post = await this.repository.updatePost(postId, {
       approvalStatus: 'rejected',
       approvedBy: actor,
@@ -292,6 +344,14 @@ export class CommunityManagerService {
         { statusCode: 409 }
       );
     }
+
+    await this.ensureWorkflowForPost(postId, 'system');
+    await this.workflowEngine?.exportGovernedSubject(
+      'community_post',
+      postId,
+      'system',
+      `Community content exported as ${format}.`
+    );
 
     const markdown = [
       `# ${post.headline || post.title}`,

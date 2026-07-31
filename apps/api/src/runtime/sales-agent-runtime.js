@@ -3,6 +3,7 @@ import { SalesAgentService } from '../services/sales-agent/SalesAgentService.js'
 import { aiGateway, retrievalService } from './assistant-runtime.js';
 import { listDocuments, listPrompts } from './content-runtime.js';
 import { databasePool } from './database-runtime.js';
+import { workflowEngine } from './workflow-runtime.js';
 
 const repository = new SalesAgentRepository(databasePool);
 
@@ -12,6 +13,7 @@ export const salesAgentService = new SalesAgentService({
   retrievalService,
   listDocuments,
   listPrompts,
+  workflowEngine,
 });
 
 export async function initializeSalesAgentRuntime() {

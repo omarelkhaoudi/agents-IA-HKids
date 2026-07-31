@@ -32,6 +32,7 @@ export class KnowledgePlatformService {
       options.documentRepository || new KnowledgeDocumentRepository(pool);
     this.refreshCaches = options.refreshCaches || (async () => {});
     this.scheduleRefreshIndex = options.scheduleRefreshIndex || (() => {});
+    this.workflowEngine = options.workflowEngine || null;
   }
 
   async seedCollectionsIfEmpty() {
@@ -276,7 +277,71 @@ export class KnowledgePlatformService {
     return deleted;
   }
 
-  async transitionStatus(documentId, nextStatus, actor = '', summary = '') {
+  async ensureWorkflow(document, actor = '') {
+    if (!this.workflowEngine || !document?.id) {
+      return null;
+    }
+
+    return this.workflowEngine.createGovernedWorkflow({
+      subjectType: 'knowledge_document',
+      subjectId: document.id,
+      workflowDefinitionCode: 'knowledge-publication',
+      policyCode: 'knowledge-policy',
+      agentCode: 'knowledge-platform',
+      priority: document.priority >= 3 ? 'high' : 'normal',
+      reviewers: ['Knowledge Manager'],
+      actor: actor || document.owner || 'knowledge-platform',
+      source: 'knowledge_platform',
+      metadata: {
+        title: document.title,
+        category: document.category,
+        collectionId: document.collectionId,
+        requiresHumanApproval: true,
+      },
+    });
+  }
+
+  async governTransition(existing, nextStatus, actor = '', summary = '') {
+    if (!this.workflowEngine || !existing?.id) {
+      return;
+    }
+
+    await this.ensureWorkflow(existing, actor);
+
+    if (nextStatus === 'review') {
+      await this.workflowEngine.submitGovernedSubject(
+        'knowledge_document',
+        existing.id,
+        actor || 'knowledge-platform',
+        summary || 'Knowledge document submitted for review.'
+      );
+    }
+
+    if (nextStatus === 'approved' || nextStatus === 'active') {
+      const workflow = await this.workflowEngine.approveGovernedSubject(
+        'knowledge_document',
+        existing.id,
+        actor || 'knowledge-platform',
+        summary || 'Knowledge document approved.'
+      );
+      if (workflow.currentState !== 'Approved') {
+        const error = new Error('Additional workflow approvals are required before publishing knowledge.');
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+
+    if (nextStatus === 'draft' && existing.status === 'review') {
+      await this.workflowEngine.rejectGovernedSubject(
+        'knowledge_document',
+        existing.id,
+        actor || 'knowledge-platform',
+        summary || 'Knowledge corrections requested.'
+      );
+    }
+  }
+
+  async transitionStatus(documentId, nextStatus, actor = '', summary = '', options = {}) {
     const existing = await this.documentRepository.getById(documentId);
     if (!existing || existing.status === 'deleted') {
       return null;
@@ -295,6 +360,10 @@ export class KnowledgePlatformService {
       const error = new Error(`Cannot transition from ${existing.status} to ${nextStatus}`);
       error.statusCode = 400;
       throw error;
+    }
+
+    if (!options.skipWorkflow) {
+      await this.governTransition(existing, nextStatus, actor, summary);
     }
 
     const patch = {
@@ -330,20 +399,32 @@ export class KnowledgePlatformService {
     return updated;
   }
 
-  submitForReview(documentId, actor = '', comment = '') {
-    return this.transitionStatus(documentId, 'review', actor, comment || 'Submitted for review');
+  submitForReview(documentId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(
+      documentId,
+      'review',
+      actor,
+      comment || 'Submitted for review',
+      options
+    );
   }
 
-  publishDocument(documentId, actor = '', comment = '') {
-    return this.transitionStatus(documentId, 'active', actor, comment || 'Published');
+  publishDocument(documentId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(documentId, 'active', actor, comment || 'Published', options);
   }
 
-  requestCorrections(documentId, actor = '', comment = '') {
-    return this.transitionStatus(documentId, 'draft', actor, comment || 'Corrections requested');
+  requestCorrections(documentId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(
+      documentId,
+      'draft',
+      actor,
+      comment || 'Corrections requested',
+      options
+    );
   }
 
-  archiveDocument(documentId, actor = '', comment = '') {
-    return this.transitionStatus(documentId, 'archived', actor, comment || 'Archived');
+  archiveDocument(documentId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(documentId, 'archived', actor, comment || 'Archived', options);
   }
 
   listVersions(documentId) {

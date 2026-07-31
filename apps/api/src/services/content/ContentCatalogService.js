@@ -29,25 +29,34 @@ Type: ${document.fileType}
 }
 
 export class ContentCatalogService {
-  constructor(pool) {
+  constructor(pool, options = {}) {
     this.documentRepository = new KnowledgeDocumentRepository(pool);
     this.promptRepository = new PromptDefinitionRepository(pool);
     this.knowledgePlatform = new KnowledgePlatformService(pool, {
       documentRepository: this.documentRepository,
       refreshCaches: () => this.refreshCaches(),
+      workflowEngine: options.workflowEngine || null,
     });
     this.promptPlatform = new PromptPlatformService(pool, {
       promptRepository: this.promptRepository,
       refreshCaches: () => this.refreshCaches(),
+      workflowEngine: options.workflowEngine || null,
     });
     this.documentManagement = new DocumentManagementService(pool, {
       documentRepository: this.documentRepository,
       knowledgePlatform: this.knowledgePlatform,
       refreshCaches: () => this.refreshCaches(),
+      workflowEngine: options.workflowEngine || null,
     });
     this.documentsCache = [];
     this.promptsCache = [];
     this.sourcesCache = [];
+  }
+
+  setWorkflowEngine(workflowEngine) {
+    this.knowledgePlatform.workflowEngine = workflowEngine;
+    this.promptPlatform.workflowEngine = workflowEngine;
+    this.documentManagement.workflowEngine = workflowEngine;
   }
 
   async initialize() {

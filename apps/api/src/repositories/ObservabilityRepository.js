@@ -647,6 +647,58 @@ export class ObservabilityRepository {
     };
   }
 
+  async getWorkflowGovernanceStatistics() {
+    const [tasks, escalations, sla, delegations] = await Promise.all([
+      this.pool.query(
+        `
+          SELECT
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0)::int AS pending,
+            COALESCE(SUM(CASE WHEN status = 'pending' AND due_at < NOW() THEN 1 ELSE 0 END), 0)::int AS overdue
+          FROM workflow_approval_tasks
+        `
+      ),
+      this.pool.query(
+        `
+          SELECT
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN status IN ('open', 'pending') THEN 1 ELSE 0 END), 0)::int AS active,
+            COALESCE(SUM(CASE WHEN escalation_type = 'approval_timeout' THEN 1 ELSE 0 END), 0)::int AS timeouts
+          FROM workflow_escalations
+        `
+      ),
+      this.pool.query(
+        `
+          SELECT
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN event_type = 'sla_breached' THEN 1 ELSE 0 END), 0)::int AS breaches
+          FROM workflow_sla_events
+        `
+      ),
+      this.pool.query(
+        `
+          SELECT
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)::int AS active
+          FROM workflow_delegations
+        `
+      ),
+    ]);
+
+    return {
+      approvalTasks: tasks.rows[0]?.total || 0,
+      pendingApprovalTasks: tasks.rows[0]?.pending || 0,
+      overdueApprovalTasks: tasks.rows[0]?.overdue || 0,
+      escalations: escalations.rows[0]?.total || 0,
+      activeEscalations: escalations.rows[0]?.active || 0,
+      timeoutEscalations: escalations.rows[0]?.timeouts || 0,
+      slaEvents: sla.rows[0]?.total || 0,
+      slaBreaches: sla.rows[0]?.breaches || 0,
+      delegations: delegations.rows[0]?.total || 0,
+      activeDelegations: delegations.rows[0]?.active || 0,
+    };
+  }
+
   async getPromptUsage({ limit = 10 } = {}) {
     const result = await this.pool.query(
       `

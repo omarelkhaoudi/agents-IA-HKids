@@ -14,6 +14,7 @@ import { WorkflowEvaluationService } from '../services/evaluation/WorkflowEvalua
 import { aiGateway, persistenceService } from './assistant-runtime.js';
 import { observabilityService } from './observability-runtime.js';
 import { securityDashboardService } from './security-runtime.js';
+import { workflowEngine } from './workflow-runtime.js';
 import { logger } from '../utils/logger.js';
 
 const evaluationRepository = new EvaluationRepository(persistenceService.pool);
@@ -26,7 +27,10 @@ export const knowledgeEvaluationService = new KnowledgeEvaluationService({
   staleDays: env.evaluationStaleKnowledgeDays,
 });
 
-export const workflowEvaluationService = new WorkflowEvaluationService({ evaluationRepository });
+export const workflowEvaluationService = new WorkflowEvaluationService({
+  evaluationRepository,
+  workflowEngine,
+});
 
 export const promptEvaluationService = new PromptEvaluationService({
   evaluationRepository,

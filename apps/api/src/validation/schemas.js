@@ -108,6 +108,124 @@ export const workflowTransitionBodySchema = z.object({
   comment: mediumText.optional(),
 });
 
+const workflowApprovalLevelSchema = z.object({
+  levelIndex: z.number().int().min(1).max(50).optional(),
+  levelName: z.string().trim().max(255).optional(),
+  name: z.string().trim().max(255).optional(),
+  approverType: z
+    .enum([
+      'role',
+      'department',
+      'manager_hierarchy',
+      'owner',
+      'fallback',
+      'agent_specific',
+      'knowledge_approver',
+      'prompt_approver',
+      'document_approver',
+      'user',
+    ])
+    .optional(),
+  approvers: z.array(z.string().trim().min(1).max(255)).max(50).default([]),
+  required: z.boolean().optional(),
+  strategy: z.enum(['all_required', 'majority', 'first_responder']).optional(),
+  timeoutMinutes: z.number().int().min(1).max(525600).optional(),
+});
+
+const workflowSlaSchema = z.object({
+  expectedDurationMinutes: z.number().int().min(1).max(525600).optional(),
+  maximumDurationMinutes: z.number().int().min(1).max(525600).optional(),
+  businessHours: z.boolean().optional(),
+  escalationMinutes: z.number().int().min(1).max(525600).optional(),
+  pauseAllowed: z.boolean().optional(),
+});
+
+export const workflowDefinitionBodySchema = z.object({
+  name: shortText,
+  code: z.string().trim().min(1).max(120).regex(/^[a-z0-9-]+$/i),
+  category: z.string().trim().max(120).default('general'),
+  description: mediumText.optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).default([]),
+  owner: z.string().trim().max(255).optional(),
+  status: z.enum(['draft', 'published', 'archived', 'deprecated']).default('draft'),
+  priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
+  policyId: idSchema.nullable().optional(),
+  executionMode: z.enum(['sequential', 'parallel', 'mixed']).default('sequential'),
+  approvalStrategy: z.enum(['all_required', 'majority', 'first_responder']).default('all_required'),
+  approvalChain: z.array(workflowApprovalLevelSchema).min(1).max(50),
+  conditions: z.array(z.record(z.unknown())).max(100).default([]),
+  sla: workflowSlaSchema.default({}),
+  escalationRules: z.array(z.record(z.unknown())).max(100).default([]),
+  metadata: z.record(z.unknown()).default({}),
+  changeSummary: mediumText.optional(),
+});
+
+export const workflowDefinitionPatchSchema = workflowDefinitionBodySchema.partial().extend({
+  changeSummary: mediumText.optional(),
+});
+
+export const workflowSimulationBodySchema = z.object({
+  workflowDefinitionId: idSchema.optional(),
+  workflowDefinitionCode: z.string().trim().max(120).optional(),
+  policyCode: z.string().trim().max(120).optional(),
+  reviewers: z.array(z.string().trim().min(1).max(255)).max(50).default([]),
+  definition: workflowDefinitionBodySchema.partial().optional(),
+  conditions: z.array(z.record(z.unknown())).max(100).default([]),
+  sla: workflowSlaSchema.default({}),
+});
+
+export const workflowApprovalDecisionBodySchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  actor: z.string().trim().max(255).optional(),
+  comment: mediumText.optional(),
+});
+
+export const workflowDelegationBodySchema = z.object({
+  delegator: z.string().trim().min(1).max(255),
+  delegate: z.string().trim().min(1).max(255),
+  delegationType: z.enum(['temporary', 'permanent', 'vacation']).default('temporary'),
+  scope: z.string().trim().max(255).default('all'),
+  reason: mediumText.optional(),
+  startsAt: z.string().trim().max(80).optional(),
+  expiresAt: z.string().trim().max(80).nullable().optional(),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export const workflowEscalationBodySchema = z.object({
+  workflowInstanceId: idSchema.optional(),
+  approvalTaskId: idSchema.optional(),
+  escalationType: z
+    .enum([
+      'approval_timeout',
+      'reviewer_unavailable',
+      'multiple_rejections',
+      'workflow_blocked',
+      'high_priority',
+      'critical_incident',
+      'manual',
+    ])
+    .default('manual'),
+  fromReviewer: z.string().trim().max(255).optional(),
+  toReviewer: z.string().trim().max(255).optional(),
+  reason: mediumText.optional(),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export const workflowImportBodySchema = z.object({
+  definition: workflowDefinitionBodySchema.partial(),
+  versions: z.array(z.record(z.unknown())).optional(),
+});
+
+export const workflowVersionParamsSchema = z.object({
+  id: idSchema,
+  version: z.coerce.number().int().min(1),
+});
+
+export const workflowCompareQuerySchema = z.object({
+  left: z.coerce.number().int().min(1),
+  right: z.coerce.number().int().min(1),
+});
+
 export const feedbackBodySchema = z.object({
   conversationId: idSchema,
   messageId: idSchema.optional(),

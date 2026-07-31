@@ -117,12 +117,13 @@ function slugify(value) {
 }
 
 export class SalesAgentService {
-  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts }) {
+  constructor({ repository, aiGateway, retrievalService, listDocuments, listPrompts, workflowEngine = null }) {
     this.repository = repository;
     this.aiGateway = aiGateway;
     this.retrievalService = retrievalService;
     this.listDocuments = listDocuments;
     this.listPrompts = listPrompts;
+    this.workflowEngine = workflowEngine;
     this.documentRenderer = new DocumentRenderer();
   }
 
@@ -191,6 +192,35 @@ export class SalesAgentService {
           ['sales', 'commercial', 'pricing', 'product', 'contract', 'policy'].includes(tag)
         )
       );
+    });
+  }
+
+  ensureWorkflowForQuotation(id, actor = 'sales-agent') {
+    return this.workflowEngine?.createGovernedWorkflow({
+      subjectType: 'sales_quotation',
+      subjectId: id,
+      agentCode: 'sales-agent',
+      workflowDefinitionCode: 'quotation-approval',
+      policyCode: 'sales-policy',
+      reviewers: ['Sales Manager', 'Administrator'],
+      actor,
+      source: 'sales-agent',
+      priority: 'high',
+      metadata: { requiresHumanApproval: true },
+    });
+  }
+
+  ensureWorkflowForDocument(id, actor = 'sales-agent') {
+    return this.workflowEngine?.createGovernedWorkflow({
+      subjectType: 'sales_document',
+      subjectId: id,
+      agentCode: 'sales-agent',
+      workflowDefinitionCode: 'document-approval',
+      policyCode: 'sales-policy',
+      reviewers: ['Sales Manager'],
+      actor,
+      source: 'sales-agent',
+      metadata: { requiresHumanApproval: true },
     });
   }
 
@@ -282,6 +312,8 @@ export class SalesAgentService {
         },
       },
     });
+
+    await this.ensureWorkflowForDocument(document.id, userId || 'sales-agent');
 
     return { document, retrieval, generation, parsed };
   }
@@ -400,14 +432,30 @@ export class SalesAgentService {
       },
     });
 
+    await this.ensureWorkflowForQuotation(quotation.id, userId || 'sales-agent');
+
     return { quotation, retrieval, generation, parsed };
   }
 
   async submitQuotationReview(id) {
+    await this.ensureWorkflowForQuotation(id);
+    await this.workflowEngine?.submitGovernedSubject(
+      'sales_quotation',
+      id,
+      'reviewer',
+      'Quotation submitted for review.'
+    );
     return this.repository.updateQuotation(id, { approvalStatus: 'pending_review' });
   }
 
   async approveQuotation(id, actor = 'reviewer') {
+    await this.ensureWorkflowForQuotation(id, actor);
+    await this.workflowEngine?.approveGovernedSubject(
+      'sales_quotation',
+      id,
+      actor,
+      'Quotation approved.'
+    );
     return this.repository.updateQuotation(id, {
       approvalStatus: 'approved',
       approvedAt: new Date().toISOString(),
@@ -416,6 +464,13 @@ export class SalesAgentService {
   }
 
   async rejectQuotation(id, actor = 'reviewer') {
+    await this.ensureWorkflowForQuotation(id, actor);
+    await this.workflowEngine?.rejectGovernedSubject(
+      'sales_quotation',
+      id,
+      actor,
+      'Quotation rejected.'
+    );
     return this.repository.updateQuotation(id, {
       approvalStatus: 'rejected',
       approvedBy: actor,
@@ -423,10 +478,24 @@ export class SalesAgentService {
   }
 
   async submitDocumentReview(id) {
+    await this.ensureWorkflowForDocument(id);
+    await this.workflowEngine?.submitGovernedSubject(
+      'sales_document',
+      id,
+      'reviewer',
+      'Sales document submitted for review.'
+    );
     return this.repository.updateDocument(id, { approvalStatus: 'pending_review' });
   }
 
   async approveDocument(id, actor = 'reviewer') {
+    await this.ensureWorkflowForDocument(id, actor);
+    await this.workflowEngine?.approveGovernedSubject(
+      'sales_document',
+      id,
+      actor,
+      'Sales document approved.'
+    );
     return this.repository.updateDocument(id, {
       approvalStatus: 'approved',
       approvedAt: new Date().toISOString(),
@@ -435,6 +504,13 @@ export class SalesAgentService {
   }
 
   async rejectDocument(id, actor = 'reviewer') {
+    await this.ensureWorkflowForDocument(id, actor);
+    await this.workflowEngine?.rejectGovernedSubject(
+      'sales_document',
+      id,
+      actor,
+      'Sales document rejected.'
+    );
     return this.repository.updateDocument(id, {
       approvalStatus: 'rejected',
       approvedBy: actor,
@@ -504,6 +580,14 @@ export class SalesAgentService {
         { statusCode: 409 }
       );
     }
+
+    await this.ensureWorkflowForQuotation(id, 'system');
+    await this.workflowEngine?.exportGovernedSubject(
+      'sales_quotation',
+      id,
+      'system',
+      `Quotation exported as ${format}.`
+    );
 
     const markdown = [
       `# ${quotation.title}`,
@@ -581,6 +665,14 @@ export class SalesAgentService {
         { statusCode: 409 }
       );
     }
+
+    await this.ensureWorkflowForDocument(id, 'system');
+    await this.workflowEngine?.exportGovernedSubject(
+      'sales_document',
+      id,
+      'system',
+      `Sales document exported as ${format}.`
+    );
 
     const markdown = [
       `# ${document.title}`,

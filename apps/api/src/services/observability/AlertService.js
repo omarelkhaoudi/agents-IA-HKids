@@ -51,10 +51,20 @@ export class AlertService {
     const lastHour = new Date(now - 60 * 60 * 1000);
     const lastDay = new Date(now - 24 * 60 * 60 * 1000);
 
-    const [hourSummary, health, approvals, retrievalFailures, permissionViolations, tenantViolations, failedAuthentications] = await Promise.all([
+    const [
+      hourSummary,
+      health,
+      approvals,
+      workflowGovernance,
+      retrievalFailures,
+      permissionViolations,
+      tenantViolations,
+      failedAuthentications,
+    ] = await Promise.all([
       this.observabilityRepository.getUsageSummary({ since: lastHour }),
       this.systemHealthMonitor.getSystemHealth(),
       this.observabilityRepository.getApprovalStatistics(),
+      this.observabilityRepository.getWorkflowGovernanceStatistics(),
       this.observabilityRepository.countEvents({
         eventType: 'retrieval_failed',
         since: lastDay,
@@ -165,6 +175,48 @@ export class AlertService {
         observedValue: approvals.failedWorkflows,
         thresholdValue: this.thresholds.failedWorkflows,
         metadata: { workflowStates: approvals.workflowStates },
+      });
+    }
+
+    if (workflowGovernance.pendingApprovalTasks >= this.thresholds.pendingApprovals) {
+      candidates.push({
+        alertKey: 'workflow:approval-queue',
+        ruleCode: 'approval_queue',
+        category: 'workflow',
+        severity: 'warning',
+        title: 'Workflow approval queue is growing',
+        description: `${workflowGovernance.pendingApprovalTasks} workflow approval task(s) are pending.`,
+        observedValue: workflowGovernance.pendingApprovalTasks,
+        thresholdValue: this.thresholds.pendingApprovals,
+        metadata: workflowGovernance,
+      });
+    }
+
+    if (workflowGovernance.overdueApprovalTasks > 0 || workflowGovernance.slaBreaches > 0) {
+      candidates.push({
+        alertKey: 'workflow:sla-breach',
+        ruleCode: 'workflow_sla_breach',
+        category: 'workflow',
+        severity: workflowGovernance.slaBreaches > 0 ? 'critical' : 'warning',
+        title: 'Workflow SLA attention required',
+        description: `${workflowGovernance.overdueApprovalTasks} overdue task(s) and ${workflowGovernance.slaBreaches} SLA breach event(s) detected.`,
+        observedValue: workflowGovernance.overdueApprovalTasks + workflowGovernance.slaBreaches,
+        thresholdValue: 0,
+        metadata: workflowGovernance,
+      });
+    }
+
+    if (workflowGovernance.activeEscalations > 0) {
+      candidates.push({
+        alertKey: 'workflow:active-escalations',
+        ruleCode: 'workflow_escalation',
+        category: 'workflow',
+        severity: workflowGovernance.timeoutEscalations > 0 ? 'critical' : 'warning',
+        title: 'Workflow escalations are active',
+        description: `${workflowGovernance.activeEscalations} workflow escalation(s) are active.`,
+        observedValue: workflowGovernance.activeEscalations,
+        thresholdValue: 0,
+        metadata: workflowGovernance,
       });
     }
 

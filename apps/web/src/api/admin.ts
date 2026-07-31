@@ -8,6 +8,15 @@ import type {
   SystemStatus,
 } from '../types/admin';
 import type { VectorIndexAction, VectorIndexJob, VectorKnowledgeStats } from '../types/knowledge-base';
+import type {
+  WorkflowAnalytics,
+  WorkflowApprovalTask,
+  WorkflowDashboard,
+  WorkflowDefinition,
+  WorkflowDefinitionShape,
+  WorkflowSimulation,
+  WorkflowTemplate,
+} from '../types/workflow-governance';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
@@ -25,6 +34,88 @@ export async function getSystemStatus(): Promise<SystemStatus> {
 
 export async function getAdminSecurityDashboard(): Promise<SecurityDashboard> {
   return apiRequest('/api/admin/security');
+}
+
+export async function getAdminWorkflowDashboard(
+  days = 30
+): Promise<WorkflowDashboard> {
+  return apiRequest(`/api/admin/workflows?days=${encodeURIComponent(String(days))}`);
+}
+
+export async function getAdminWorkflowAnalytics(
+  days = 30
+): Promise<WorkflowAnalytics> {
+  return apiRequest(`/api/admin/workflows/analytics?days=${encodeURIComponent(String(days))}`);
+}
+
+export async function getWorkflowDefinitions(): Promise<{ items: WorkflowDefinition[] }> {
+  return apiRequest('/api/workflows/definitions?limit=100');
+}
+
+export async function getWorkflowTemplates(): Promise<{ items: WorkflowTemplate[] }> {
+  return apiRequest('/api/workflows/templates');
+}
+
+export async function getWorkflowApprovalTasks(
+  params: { status?: string; reviewer?: string } = {}
+): Promise<{ items: WorkflowApprovalTask[] }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
+  return apiRequest(`/api/workflows/approvals?${query.toString()}`);
+}
+
+export async function simulateWorkflow(
+  payload: {
+    workflowDefinitionId?: string;
+    workflowDefinitionCode?: string;
+    policyCode?: string;
+    reviewers?: string[];
+    definition?: WorkflowDefinitionShape;
+  }
+): Promise<WorkflowSimulation> {
+  return apiRequest('/api/workflows/simulation', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createWorkflowDefinition(
+  payload: WorkflowDefinitionShape & {
+    name: string;
+    code: string;
+    category: string;
+    status?: string;
+    tags?: string[];
+    owner?: string;
+  }
+): Promise<WorkflowDefinition> {
+  return apiRequest('/api/workflows', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function publishWorkflowDefinition(id: string): Promise<WorkflowDefinition> {
+  return apiRequest(`/api/workflows/${encodeURIComponent(id)}/publish`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function archiveWorkflowDefinition(id: string): Promise<WorkflowDefinition> {
+  return apiRequest(`/api/workflows/${encodeURIComponent(id)}/archive`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function cloneWorkflowDefinition(id: string): Promise<WorkflowDefinition> {
+  return apiRequest(`/api/workflows/${encodeURIComponent(id)}/clone`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function validateAdminSecrets(): Promise<SecurityDashboard['secretHealth']> {

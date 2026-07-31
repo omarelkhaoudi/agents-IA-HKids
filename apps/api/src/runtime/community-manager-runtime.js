@@ -3,6 +3,7 @@ import { CommunityManagerService } from '../services/community-manager/Community
 import { aiGateway, retrievalService } from './assistant-runtime.js';
 import { listDocuments, listPrompts } from './content-runtime.js';
 import { databasePool } from './database-runtime.js';
+import { workflowEngine } from './workflow-runtime.js';
 
 const repository = new CommunityManagerRepository(databasePool);
 
@@ -12,6 +13,7 @@ export const communityManagerService = new CommunityManagerService({
   retrievalService,
   listDocuments,
   listPrompts,
+  workflowEngine,
 });
 
 export async function initializeCommunityManagerRuntime() {

@@ -1,4 +1,5 @@
 import { persistenceService } from './assistant-runtime.js';
+import { contentCatalogService } from './content-runtime.js';
 import { ApprovalService } from '../services/workflows/ApprovalService.js';
 import { NotificationService } from '../services/workflows/NotificationService.js';
 import { WorkflowEngine } from '../services/workflows/WorkflowEngine.js';
@@ -14,5 +15,7 @@ export const workflowEngine = new WorkflowEngine({
   workflowRules,
   workflowHistory: new WorkflowHistory(workflowRepository),
   approvalService: new ApprovalService(),
-  notificationService: new NotificationService(),
+  notificationService: new NotificationService({ workflowRepository }),
 });
+
+contentCatalogService.setWorkflowEngine(workflowEngine);

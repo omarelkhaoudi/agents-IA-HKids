@@ -16,6 +16,7 @@ import {
   securityDashboardService,
   securityRepository,
 } from '../runtime/security-runtime.js';
+import { workflowEngine } from '../runtime/workflow-runtime.js';
 import {
   createAgentBodySchema,
   exportQuerySchema,
@@ -51,6 +52,14 @@ adminRouter.get('/admin/vector/stats', async (_request, response) => {
 
 adminRouter.get('/admin/security', async (_request, response) => {
   response.json(await securityDashboardService.getDashboard());
+});
+
+adminRouter.get('/admin/workflows', async (request, response) => {
+  response.json(await workflowEngine.getDashboard({ days: request.query.days }));
+});
+
+adminRouter.get('/admin/workflows/analytics', async (request, response) => {
+  response.json(await workflowEngine.getAnalytics({ days: request.query.days }));
 });
 
 adminRouter.get('/admin/security/events', async (request, response) => {

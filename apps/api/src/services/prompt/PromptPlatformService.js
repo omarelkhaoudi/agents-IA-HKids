@@ -97,6 +97,7 @@ export class PromptPlatformService {
     this.aiGateway = options.aiGateway || null;
     this.retrievalService = options.retrievalService || null;
     this.listDocuments = options.listDocuments || (() => []);
+    this.workflowEngine = options.workflowEngine || null;
   }
 
   async seedLibrariesIfEmpty() {
@@ -329,7 +330,71 @@ export class PromptPlatformService {
     return deleted;
   }
 
-  async transitionStatus(promptId, nextStatus, actor = '', summary = '') {
+  async ensureWorkflow(prompt, actor = '') {
+    if (!this.workflowEngine || !prompt?.id) {
+      return null;
+    }
+
+    return this.workflowEngine.createGovernedWorkflow({
+      subjectType: 'prompt_definition',
+      subjectId: prompt.id,
+      workflowDefinitionCode: 'prompt-publication',
+      policyCode: 'prompt-policy',
+      agentCode: prompt.agentCode || 'prompt-platform',
+      priority: prompt.priority >= 3 ? 'high' : 'normal',
+      reviewers: ['Prompt Owner'],
+      actor: actor || prompt.owner || 'prompt-platform',
+      source: 'prompt_platform',
+      metadata: {
+        name: prompt.name,
+        libraryId: prompt.libraryId,
+        targetModel: prompt.targetModel,
+        requiresHumanApproval: true,
+      },
+    });
+  }
+
+  async governTransition(existing, nextStatus, actor = '', summary = '') {
+    if (!this.workflowEngine || !existing?.id) {
+      return;
+    }
+
+    await this.ensureWorkflow(existing, actor);
+
+    if (nextStatus === 'review') {
+      await this.workflowEngine.submitGovernedSubject(
+        'prompt_definition',
+        existing.id,
+        actor || 'prompt-platform',
+        summary || 'Prompt submitted for review.'
+      );
+    }
+
+    if (nextStatus === 'approved' || nextStatus === 'active') {
+      const workflow = await this.workflowEngine.approveGovernedSubject(
+        'prompt_definition',
+        existing.id,
+        actor || 'prompt-platform',
+        summary || 'Prompt approved.'
+      );
+      if (workflow.currentState !== 'Approved') {
+        const error = new Error('Additional workflow approvals are required before publishing prompts.');
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+
+    if (nextStatus === 'draft' && existing.status === 'review') {
+      await this.workflowEngine.rejectGovernedSubject(
+        'prompt_definition',
+        existing.id,
+        actor || 'prompt-platform',
+        summary || 'Prompt corrections requested.'
+      );
+    }
+  }
+
+  async transitionStatus(promptId, nextStatus, actor = '', summary = '', options = {}) {
     const existing = await this.promptRepository.getById(promptId);
     if (!existing) return null;
 
@@ -346,6 +411,10 @@ export class PromptPlatformService {
       const error = new Error(`Cannot transition from ${existing.status} to ${nextStatus}`);
       error.statusCode = 400;
       throw error;
+    }
+
+    if (!options.skipWorkflow) {
+      await this.governTransition(existing, nextStatus, actor, summary);
     }
 
     const patch = { status: nextStatus };
@@ -379,32 +448,44 @@ export class PromptPlatformService {
     return updated;
   }
 
-  submitForReview(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'review', actor, comment || 'Submitted for review');
+  submitForReview(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(
+      promptId,
+      'review',
+      actor,
+      comment || 'Submitted for review',
+      options
+    );
   }
 
-  approvePrompt(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'approved', actor, comment || 'Approved');
+  approvePrompt(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(promptId, 'approved', actor, comment || 'Approved', options);
   }
 
-  publishPrompt(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'active', actor, comment || 'Published');
+  publishPrompt(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(promptId, 'active', actor, comment || 'Published', options);
   }
 
-  requestCorrections(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'draft', actor, comment || 'Corrections requested');
+  requestCorrections(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(
+      promptId,
+      'draft',
+      actor,
+      comment || 'Corrections requested',
+      options
+    );
   }
 
-  archivePrompt(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'archived', actor, comment || 'Archived');
+  archivePrompt(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(promptId, 'archived', actor, comment || 'Archived', options);
   }
 
-  deprecatePrompt(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'deprecated', actor, comment || 'Deprecated');
+  deprecatePrompt(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(promptId, 'deprecated', actor, comment || 'Deprecated', options);
   }
 
-  restorePrompt(promptId, actor = '', comment = '') {
-    return this.transitionStatus(promptId, 'active', actor, comment || 'Restored');
+  restorePrompt(promptId, actor = '', comment = '', options = {}) {
+    return this.transitionStatus(promptId, 'active', actor, comment || 'Restored', options);
   }
 
   listVersions(promptId) {
