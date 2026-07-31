@@ -2,6 +2,7 @@ import { hasMinimumRole, isWriteMethod, ROLES } from '../constants/roles.js';
 
 const ADMIN_PREFIX = '/admin';
 const AI_PREFIX = '/ai';
+const OBSERVABILITY_PREFIX = '/observability';
 const FEEDBACK_PREFIX = '/feedback';
 const WORKFLOW_SUFFIX = '/workflow';
 const DOCUMENTS_PREFIX = '/documents';
@@ -43,6 +44,21 @@ export function authorizeAccess(request, response, next) {
   }
 
   if (path.startsWith(ADMIN_PREFIX)) {
+    if (!hasMinimumRole(role, ROLES.MANAGER)) {
+      deny(response);
+      return;
+    }
+
+    if (writeRequest && !hasMinimumRole(role, ROLES.ADMINISTRATOR)) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  if (path.startsWith(OBSERVABILITY_PREFIX)) {
     if (!hasMinimumRole(role, ROLES.MANAGER)) {
       deny(response);
       return;

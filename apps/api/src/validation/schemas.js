@@ -450,6 +450,65 @@ export const exportQuerySchema = z.object({
   format: z.enum(['json', 'csv']).default('json'),
 });
 
+export const observabilityUsageQuerySchema = z.object({
+  granularity: z.enum(['hourly', 'daily', 'weekly', 'monthly']).default('daily'),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const observabilityLogsQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
+  agentCode: z.string().trim().max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const observabilityTimelineQuerySchema = z.object({
+  category: z.string().trim().max(60).optional(),
+  severity: z.enum(['info', 'warning', 'critical']).optional(),
+  days: z.coerce.number().int().min(1).max(180).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+export const observabilityAlertsQuerySchema = z.object({
+  status: z.enum(['open', 'acknowledged', 'resolved']).optional(),
+  severity: z.enum(['info', 'warning', 'critical']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const observabilityAnalyticsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const observabilitySnapshotsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+export const observabilityExportQuerySchema = z.object({
+  dataset: z
+    .enum(['usage', 'agents', 'models', 'alerts', 'timeline', 'conversations'])
+    .default('usage'),
+  format: z.enum(['json', 'csv']).default('json'),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const observabilityEventBodySchema = z.object({
+  eventType: z.string().trim().min(1).max(120),
+  category: z.string().trim().max(60).default('system'),
+  severity: z.enum(['info', 'warning', 'critical']).default('info'),
+  source: z.string().trim().max(60).default('api'),
+  subjectType: z.string().trim().max(60).optional(),
+  subjectId: z.string().trim().max(200).optional(),
+  agentCode: z.string().trim().max(120).optional(),
+  conversationId: z.string().trim().max(200).optional(),
+  summary: z.string().trim().max(500).default(''),
+  durationMs: z.coerce.number().int().min(0).max(3_600_000).optional(),
+  metadata: z.record(z.any()).default({}),
+});
+
+export const observabilityAlertActionBodySchema = z.object({
+  actor: z.string().trim().max(160).optional(),
+});
+
 const cmPlatformSchema = z.enum([
   'facebook',
   'instagram',

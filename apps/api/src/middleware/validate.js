@@ -10,15 +10,26 @@ function formatZodError(error) {
   return `${field}${firstIssue.message}`;
 }
 
+// Express 5 exposes `params` and `query` through getters, so the parsed values
+// have to be redefined on the request instead of assigned.
+function replaceRequestProperty(request, property, value) {
+  Object.defineProperty(request, property, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
 export function validate(schemas) {
   return (request, response, next) => {
     try {
       if (schemas.params) {
-        request.params = schemas.params.parse(request.params);
+        replaceRequestProperty(request, 'params', schemas.params.parse(request.params));
       }
 
       if (schemas.query) {
-        request.query = schemas.query.parse(request.query);
+        replaceRequestProperty(request, 'query', schemas.query.parse(request.query));
       }
 
       if (schemas.body) {

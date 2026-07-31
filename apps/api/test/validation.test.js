@@ -1,11 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import express from 'express';
+import { validate } from '../src/middleware/validate.js';
 import {
   createConversationBodySchema,
   feedbackBodySchema,
+  idParamsSchema,
   loginBodySchema,
+  observabilityUsageQuerySchema,
   retrievalSearchBodySchema,
 } from '../src/validation/schemas.js';
+
+async function withProbeServer(handler) {
+  const app = express();
+
+  app.get(
+    '/probe/:id',
+    validate({ params: idParamsSchema, query: observabilityUsageQuerySchema }),
+    (request, response) => {
+      response.json({ params: request.params, query: request.query });
+    }
+  );
+
+  const server = app.listen(0);
+
+  try {
+    await handler(`http://127.0.0.1:${server.address().port}`);
+  } finally {
+    server.close();
+  }
+}
 
 test('loginBodySchema validates credentials', () => {
   const valid = loginBodySchema.safeParse({
@@ -57,4 +81,23 @@ test('retrievalSearchBodySchema validates search question', () => {
 
   const invalid = retrievalSearchBodySchema.safeParse({ question: '' });
   assert.equal(invalid.success, false);
+});
+
+test('validate middleware exposes parsed query and params on the request', async () => {
+  await withProbeServer(async (baseUrl) => {
+    const parsed = await fetch(`${baseUrl}/probe/alpha?granularity=weekly&days=28`);
+    assert.equal(parsed.status, 200);
+    assert.deepEqual(await parsed.json(), {
+      params: { id: 'alpha' },
+      query: { granularity: 'weekly', days: 28 },
+    });
+
+    const defaulted = await fetch(`${baseUrl}/probe/alpha`);
+    assert.equal(defaulted.status, 200);
+    assert.deepEqual((await defaulted.json()).query, { granularity: 'daily' });
+
+    const rejected = await fetch(`${baseUrl}/probe/alpha?granularity=yearly`);
+    assert.equal(rejected.status, 400);
+    assert.equal((await rejected.json()).errors[0].path, 'granularity');
+  });
 });

@@ -73,6 +73,14 @@ export const env = {
   rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 300),
   authRateLimitWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 20),
+  aiConcurrencyCapacity: Number(process.env.AI_CONCURRENCY_CAPACITY || 8),
+  storageQuotaMegabytes: Number(process.env.STORAGE_QUOTA_MB || 2048),
+  alertLatencyMs: Number(process.env.ALERT_LATENCY_MS || 8000),
+  alertErrorRatePercent: Number(process.env.ALERT_ERROR_RATE_PERCENT || 10),
+  alertStoragePercent: Number(process.env.ALERT_STORAGE_PERCENT || 85),
+  alertPendingApprovals: Number(process.env.ALERT_PENDING_APPROVALS || 25),
+  alertFailedWorkflows: Number(process.env.ALERT_FAILED_WORKFLOWS || 5),
+  alertRetrievalFailures: Number(process.env.ALERT_RETRIEVAL_FAILURES || 3),
 };
 
 export function assertProductionConfig() {

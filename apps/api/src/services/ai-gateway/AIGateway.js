@@ -8,7 +8,9 @@ export class AIGateway {
     timeoutManager,
     usageLogger,
     streamingManager,
+    activeRequestTracker = null,
   }) {
+    this.activeRequestTracker = activeRequestTracker;
     this.providerManager = providerManager;
     this.modelManager = modelManager;
     this.tokenCounter = tokenCounter;
@@ -60,6 +62,14 @@ export class AIGateway {
     const providerClient = this.providerManager.getProvider(resolvedProvider);
     const promptTokens = this.tokenCounter.estimateMessages(systemPrompt, messages);
     const startedAt = Date.now();
+    const trackedRequestId = this.activeRequestTracker?.begin({
+      provider: resolvedProvider,
+      model: resolvedModel,
+      agentCode: agentCode || 'administrative-assistant',
+      conversationId,
+      userId,
+      streaming: Boolean(stream),
+    });
 
     try {
       let response;
@@ -127,6 +137,8 @@ export class AIGateway {
         errorMessage: null,
       };
 
+      this.activeRequestTracker?.end(trackedRequestId, { status: 'success', durationMs });
+
       await this.usageLogger.log(usage);
 
       return {
@@ -151,6 +163,12 @@ export class AIGateway {
         status: 'error',
         errorMessage: error instanceof Error ? error.message : 'Unknown AI gateway error.',
       };
+
+      this.activeRequestTracker?.end(trackedRequestId, {
+        status: 'error',
+        durationMs,
+        errorMessage: usage.errorMessage,
+      });
 
       await this.usageLogger.log(usage);
       throw error;

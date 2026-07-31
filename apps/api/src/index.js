@@ -7,6 +7,7 @@ import { initializeSetupRuntime } from './runtime/setup-runtime.js';
 import { initializeCommunityManagerRuntime } from './runtime/community-manager-runtime.js';
 import { initializeSalesAgentRuntime } from './runtime/sales-agent-runtime.js';
 import { initializeHrAgentRuntime } from './runtime/hr-agent-runtime.js';
+import { initializeObservabilityRuntime } from './runtime/observability-runtime.js';
 import { healthService } from './runtime/health-runtime.js';
 import { workflowEngine } from './runtime/workflow-runtime.js';
 import { startServer } from './server.js';
@@ -25,6 +26,7 @@ await initializeSetupRuntime();
 await initializeCommunityManagerRuntime();
 await initializeSalesAgentRuntime();
 await initializeHrAgentRuntime();
+await initializeObservabilityRuntime();
 
 const readiness = await healthService.getReadiness();
 logger.info('startup_diagnostics', {

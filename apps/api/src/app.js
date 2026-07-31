@@ -13,6 +13,7 @@ import assistantRouter from './routes/assistant.routes.js';
 import authRouter from './routes/auth.routes.js';
 import documentsRouter from './routes/documents.routes.js';
 import knowledgeRouter from './routes/knowledge.routes.js';
+import observabilityRouter from './routes/observability.routes.js';
 import feedbackRouter from './routes/feedback.routes.js';
 import generatedDocumentsRouter from './routes/generated-documents.routes.js';
 import healthRouter from './routes/health.routes.js';
@@ -55,6 +56,7 @@ export function createApp() {
   app.use('/api', authRouter);
   app.use('/api', protectedMiddleware, adminRouter);
   app.use('/api', protectedMiddleware, aiRouter);
+  app.use('/api', protectedMiddleware, observabilityRouter);
   app.use('/api', protectedMiddleware, assistantRouter);
   app.use('/api', protectedMiddleware, communityManagerRouter);
   app.use('/api', protectedMiddleware, salesAgentRouter);
