@@ -4,6 +4,7 @@ import type {
   AdminDashboardData,
   AdminResources,
   AdminSettings,
+  SecurityDashboard,
   SystemStatus,
 } from '../types/admin';
 import type { VectorIndexAction, VectorIndexJob, VectorKnowledgeStats } from '../types/knowledge-base';
@@ -20,6 +21,29 @@ export async function getAdminStatistics(): Promise<AdminDashboardData> {
 
 export async function getSystemStatus(): Promise<SystemStatus> {
   return apiRequest('/api/admin/system-status');
+}
+
+export async function getAdminSecurityDashboard(): Promise<SecurityDashboard> {
+  return apiRequest('/api/admin/security');
+}
+
+export async function validateAdminSecrets(): Promise<SecurityDashboard['secretHealth']> {
+  return apiRequest('/api/admin/security/secrets/validate', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function rotateAdminEncryptionKey(): Promise<{
+  keyId: string;
+  version: number;
+  algorithm: string;
+  rotatedAt: string;
+}> {
+  return apiRequest('/api/admin/security/encryption/rotate', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function getAdminVectorStats(): Promise<VectorKnowledgeStats> {

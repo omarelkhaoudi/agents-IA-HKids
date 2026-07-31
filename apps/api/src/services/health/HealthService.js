@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { secretManager } from '../security/SecretManager.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -57,7 +58,7 @@ export class HealthService {
         providers: providers.map((provider) => (typeof provider === 'string' ? provider : provider.id)),
         defaultProvider: env.defaultProvider,
         defaultModel: env.defaultModel,
-        anthropicConfigured: Boolean(env.anthropicApiKey),
+        anthropicConfigured: Boolean(secretManager.getProviderConfiguration('anthropic').apiKey),
         claudeReady: hasAnthropic,
       };
     } catch (error) {

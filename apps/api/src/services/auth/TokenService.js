@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
+import { SECRET_NAMES, secretManager } from '../security/SecretManager.js';
 
 export class TokenService {
-  constructor() {
+  constructor({ manager = secretManager } = {}) {
+    this.secretManager = manager;
     this.accessTokenTtl = env.jwtAccessExpiresIn;
     this.refreshTokenTtlMs = env.jwtRefreshExpiresInMs;
   }
@@ -15,8 +17,11 @@ export class TokenService {
         email: user.email,
         role: user.role,
         name: user.name,
+        tokenVersion: Number(user.tokenVersion || 0),
+        tenantId: user.tenantId || 'default-tenant',
+        organizationId: user.organizationId || 'default-organization',
       },
-      env.jwtSecret,
+      this.secretManager.getSecret(SECRET_NAMES.JWT_SECRET),
       {
         expiresIn: this.accessTokenTtl,
       }
@@ -24,7 +29,7 @@ export class TokenService {
   }
 
   verifyAccessToken(token) {
-    return jwt.verify(token, env.jwtSecret);
+    return jwt.verify(token, this.secretManager.getSecret(SECRET_NAMES.JWT_SECRET));
   }
 
   generateRefreshToken() {

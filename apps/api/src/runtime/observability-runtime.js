@@ -9,6 +9,7 @@ import { dashboardService } from './admin-runtime.js';
 import { aiGateway, persistenceService, retrievalService } from './assistant-runtime.js';
 import { healthService } from './health-runtime.js';
 import { logger } from '../utils/logger.js';
+import { securityAuditService, securityDashboardService } from './security-runtime.js';
 
 const observabilityRepository = new ObservabilityRepository(persistenceService.pool);
 
@@ -35,6 +36,9 @@ export const observabilityService = new ObservabilityService({
   dashboardService,
   retrievalService,
 });
+
+securityAuditService.setObservabilityService(observabilityService);
+securityDashboardService.setAlertService(alertService);
 
 const instrumentationBridge = new InstrumentationBridge({ observabilityService });
 

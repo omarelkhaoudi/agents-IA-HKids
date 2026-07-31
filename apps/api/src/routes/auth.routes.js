@@ -7,11 +7,20 @@ import { loginBodySchema, logoutBodySchema, refreshTokenBodySchema } from '../va
 
 const authRouter = Router();
 
+function clientMetadata(request) {
+  return {
+    ipAddress: request.ip || request.socket?.remoteAddress || '',
+    userAgent: request.get('user-agent') || '',
+    deviceId: request.get('x-device-id') || '',
+  };
+}
+
 authRouter.post('/auth/login', authRateLimiter, validate({ body: loginBodySchema }), async (request, response) => {
   try {
     const result = await authService.login({
       email: request.body?.email,
       password: request.body?.password,
+      ...clientMetadata(request),
     });
     response.json(result);
   } catch (error) {
@@ -23,7 +32,7 @@ authRouter.post('/auth/login', authRateLimiter, validate({ body: loginBodySchema
 
 authRouter.post('/auth/refresh', authRateLimiter, validate({ body: refreshTokenBodySchema }), async (request, response) => {
   try {
-    const result = await authService.refresh(request.body?.refreshToken);
+    const result = await authService.refresh(request.body?.refreshToken, clientMetadata(request));
     response.json(result);
   } catch (error) {
     response.status(401).json({

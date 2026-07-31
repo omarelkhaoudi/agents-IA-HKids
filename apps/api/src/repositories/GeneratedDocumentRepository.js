@@ -1,4 +1,8 @@
 import { buildInClause } from './queryUtils.js';
+import {
+  appendTenantFilter,
+  tenantColumnsForInsert,
+} from '../services/security/TenantContext.js';
 
 export class GeneratedDocumentRepository {
   constructor(pool) {
@@ -6,16 +10,18 @@ export class GeneratedDocumentRepository {
   }
 
   async create(payload) {
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `
         INSERT INTO generated_documents (
           id, conversation_id, agent_code, document_type, reference, structured_document,
           resolved_variables, rendered_preview, validation_warnings, available_export_formats,
-          approved, status, version, created_by, approved_by, approved_at, input, metadata
+          approved, status, version, created_by, approved_by, approved_at, input, metadata,
+          tenant_id, organization_id, owner_id
         )
         VALUES (
           $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9::jsonb, $10::jsonb,
-          $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb
+          $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19, $20, $21
         )
       `,
       [
@@ -37,6 +43,9 @@ export class GeneratedDocumentRepository {
         payload.approvedAt || null,
         JSON.stringify(payload.input || {}),
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.createdBy || '',
       ]
     );
 
@@ -53,6 +62,8 @@ export class GeneratedDocumentRepository {
   }
 
   async update(documentId, payload) {
+    const current = await this.getById(documentId);
+    if (!current) return null;
     await this.pool.query(
       `
         UPDATE generated_documents
@@ -94,19 +105,32 @@ export class GeneratedDocumentRepository {
   }
 
   async getById(documentId) {
-    const result = await this.pool.query('SELECT * FROM generated_documents WHERE id = $1', [documentId]);
+    const clauses = [`id = $1`];
+    const values = [documentId];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM generated_documents WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return result.rows[0] || null;
   }
 
   async listByConversationId(conversationId, { limit = 100, offset = 0 } = {}) {
+    const clauses = [`conversation_id = $1`];
+    const values = [conversationId];
+    appendTenantFilter(clauses, values);
+    values.push(limit);
+    const limitRef = `$${values.length}`;
+    values.push(offset);
+    const offsetRef = `$${values.length}`;
     const result = await this.pool.query(
       `
         SELECT * FROM generated_documents
-        WHERE conversation_id = $1
+        WHERE ${clauses.join(' AND ')}
         ORDER BY created_at DESC
-        LIMIT $2 OFFSET $3
+        LIMIT ${limitRef} OFFSET ${offsetRef}
       `,
-      [conversationId, limit, offset]
+      values
     );
 
     return result.rows;
@@ -153,6 +177,11 @@ export class GeneratedDocumentRepository {
     if (agentCode) {
       values.push(agentCode);
       whereClause += ` AND agent_code = $${values.length}`;
+    }
+    const tenantClauses = [];
+    appendTenantFilter(tenantClauses, values);
+    if (tenantClauses.length) {
+      whereClause += ` AND ${tenantClauses.join(' AND ')}`;
     }
 
     values.push(limit, offset);

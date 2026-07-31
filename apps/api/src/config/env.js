@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { SECRET_NAMES, secretManager } from '../services/security/SecretManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,14 +14,15 @@ dotenv.config({
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 function resolveDatabaseUrl() {
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+  const databaseUrl = secretManager.getSecret(SECRET_NAMES.DATABASE_URL);
+  if (databaseUrl) {
+    return databaseUrl;
   }
 
   const host = process.env.DB_HOST || '';
   const port = process.env.DB_PORT || '5432';
   const user = process.env.DB_USER || '';
-  const password = process.env.DB_PASSWORD || '';
+  const password = secretManager.getSecret(SECRET_NAMES.DB_PASSWORD);
   const name = process.env.DB_NAME || '';
 
   if (!host || !user || !name) {
@@ -43,20 +45,16 @@ export const env = {
   dbHost: process.env.DB_HOST || '',
   dbPort: process.env.DB_PORT || '5432',
   dbUser: process.env.DB_USER || '',
-  dbPassword: process.env.DB_PASSWORD || '',
+  dbPassword: secretManager.getSecret(SECRET_NAMES.DB_PASSWORD),
   dbName: process.env.DB_NAME || '',
   dbSsl: process.env.DB_SSL === 'true',
-  jwtSecret:
-    process.env.JWT_SECRET ||
-    (nodeEnv === 'development' || nodeEnv === 'test'
-      ? 'dev-only-jwt-secret-change-in-production'
-      : ''),
+  jwtSecret: secretManager.getSecret(SECRET_NAMES.JWT_SECRET),
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   jwtRefreshExpiresInMs: Number(process.env.JWT_REFRESH_EXPIRES_IN_MS || 7 * 24 * 60 * 60 * 1000),
   defaultAdminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'admin@hkids.app',
   defaultAdminPassword: process.env.DEFAULT_ADMIN_PASSWORD || 'Admin123!',
   defaultAdminName: process.env.DEFAULT_ADMIN_NAME || 'H-Kids Administrator',
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  anthropicApiKey: '',
   defaultProvider: process.env.DEFAULT_PROVIDER || 'anthropic',
   defaultModel: process.env.DEFAULT_MODEL || 'claude-3-5-sonnet-latest',
   maxTokens: Number(process.env.MAX_TOKENS || 1500),
@@ -82,7 +80,7 @@ export const env = {
   retrievalSemanticWeight: Number(process.env.RETRIEVAL_SEMANTIC_WEIGHT || 0.5),
   retrievalKeywordWeight: Number(process.env.RETRIEVAL_KEYWORD_WEIGHT || 0.25),
   retrievalMetadataWeight: Number(process.env.RETRIEVAL_METADATA_WEIGHT || 0.25),
-  openAiApiKey: process.env.OPENAI_API_KEY || '',
+  openAiApiKey: '',
   jsonBodyLimit: process.env.JSON_BODY_LIMIT || '1mb',
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
   rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 300),
@@ -115,7 +113,7 @@ export function assertProductionConfig() {
 
   const missing = [];
 
-  if (!env.jwtSecret) {
+  if (!secretManager.getSecret(SECRET_NAMES.JWT_SECRET)) {
     missing.push('JWT_SECRET');
   }
 

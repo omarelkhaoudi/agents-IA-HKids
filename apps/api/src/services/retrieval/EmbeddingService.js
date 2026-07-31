@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { env } from '../../config/env.js';
+import { SecretManager, SECRET_NAMES, secretManager } from '../security/SecretManager.js';
 
 const REMOTE_PROVIDERS = new Set(['openai', 'anthropic']);
 
@@ -59,6 +60,7 @@ export class EmbeddingService {
     cacheTtlMs = env.embeddingCacheTtlMs || 60 * 60 * 1000,
     fetchImpl = globalThis.fetch,
     config = env,
+    manager = null,
   } = {}) {
     this.provider = String(provider || 'mock').toLowerCase();
     this.model = model || (this.provider === 'openai' ? 'text-embedding-3-small' : 'local-bow-v1');
@@ -67,6 +69,7 @@ export class EmbeddingService {
     this.cacheTtlMs = Number(cacheTtlMs) || 60 * 60 * 1000;
     this.fetchImpl = fetchImpl;
     this.config = config;
+    this.secretManager = manager || this.createScopedSecretManager(config);
     this.cache = new Map();
     this.stats = {
       requests: 0,
@@ -75,6 +78,24 @@ export class EmbeddingService {
       totalLatencyMs: 0,
       lastError: '',
     };
+  }
+
+  createScopedSecretManager(config = {}) {
+    if (!config.openAiApiKey && !config.anthropicApiKey && !config.claudeApiKey) {
+      return secretManager;
+    }
+
+    const scopedManager = new SecretManager({ source: {} });
+    if (config.openAiApiKey) {
+      scopedManager.setLocalSecret(SECRET_NAMES.OPENAI_API_KEY, config.openAiApiKey);
+    }
+    if (config.anthropicApiKey || config.claudeApiKey) {
+      scopedManager.setLocalSecret(
+        SECRET_NAMES.CLAUDE_API_KEY,
+        config.anthropicApiKey || config.claudeApiKey
+      );
+    }
+    return scopedManager;
   }
 
   getProviderInfo() {
@@ -235,7 +256,8 @@ export class EmbeddingService {
   }
 
   async generateOpenAiBatch(texts) {
-    if (!this.config.openAiApiKey) {
+    const { apiKey } = this.secretManager.getProviderConfiguration('openai');
+    if (!apiKey) {
       throw new Error('OPENAI_API_KEY is required for OpenAI embeddings.');
     }
     if (!this.fetchImpl) {
@@ -247,7 +269,7 @@ export class EmbeddingService {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${this.config.openAiApiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -272,7 +294,8 @@ export class EmbeddingService {
     if (!this.config.anthropicEmbeddingBaseUrl) {
       throw new Error('ANTHROPIC_EMBEDDING_BASE_URL is required for Anthropic-compatible embeddings.');
     }
-    if (!this.config.anthropicApiKey) {
+    const { apiKey } = this.secretManager.getProviderConfiguration('anthropic');
+    if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY is required for Anthropic-compatible embeddings.');
     }
     if (!this.fetchImpl) {
@@ -282,8 +305,8 @@ export class EmbeddingService {
     const response = await this.fetchImpl(`${this.config.anthropicEmbeddingBaseUrl}/embeddings`, {
       method: 'POST',
       headers: {
-        'x-api-key': this.config.anthropicApiKey,
-        Authorization: `Bearer ${this.config.anthropicApiKey}`,
+        'x-api-key': apiKey,
+        Authorization: `Bearer ${apiKey}`,
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },

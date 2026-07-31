@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { authenticate } from './middleware/authenticate.js';
 import { authorizeAccess } from './middleware/authorize.js';
+import { tenantContextMiddleware } from './middleware/tenantContext.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -28,7 +29,7 @@ import salesAgentRouter from './routes/sales-agent.routes.js';
 import hrAgentRouter from './routes/hr-agent.routes.js';
 import workflowRouter from './routes/workflow.routes.js';
 
-const protectedMiddleware = [authenticate, authorizeAccess];
+const protectedMiddleware = [authenticate, tenantContextMiddleware, authorizeAccess];
 
 export function createApp() {
   const app = express();

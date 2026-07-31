@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  appendTenantFilter,
+  tenantColumnsForInsert,
+} from '../services/security/TenantContext.js';
 
 function asJson(value, fallback) {
   if (value == null) return fallback;
@@ -111,6 +115,11 @@ export class KnowledgeDocumentRepository {
       lastIndexError: row.last_index_error || '',
       retrievalSuccessCount: Number(row.retrieval_success_count || 0),
       retrievalFailureCount: Number(row.retrieval_failure_count || 0),
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
+      ownerId: row.owner_id || row.owner || row.author || '',
+      aclVisibility: row.acl_visibility || 'organization',
+      aclInherits: row.acl_inherits !== false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -141,6 +150,9 @@ export class KnowledgeDocumentRepository {
       icon: row.icon,
       color: row.color,
       owner: row.owner,
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
+      ownerId: row.owner_id || row.owner || '',
       status: row.status,
       priority: row.priority,
       language: row.language,
@@ -150,8 +162,12 @@ export class KnowledgeDocumentRepository {
   }
 
   async count() {
+    const clauses = [`deleted_at IS NULL`, `status <> 'deleted'`];
+    const values = [];
+    appendTenantFilter(clauses, values);
     const result = await this.pool.query(
-      `SELECT COUNT(*)::int AS count FROM knowledge_documents WHERE deleted_at IS NULL AND status <> 'deleted'`
+      `SELECT COUNT(*)::int AS count FROM knowledge_documents WHERE ${clauses.join(' AND ')}`,
+      values
     );
     return result.rows[0]?.count || 0;
   }
@@ -164,6 +180,7 @@ export class KnowledgeDocumentRepository {
       clauses.push(`deleted_at IS NULL`);
       clauses.push(`status <> 'deleted'`);
     }
+    appendTenantFilter(clauses, values);
 
     if (filters.status) {
       values.push(filters.status);
@@ -228,10 +245,14 @@ export class KnowledgeDocumentRepository {
   }
 
   async listSources() {
+    const clauses = [`deleted_at IS NULL`, `status IN ('active', 'approved', 'review')`];
+    const values = [];
+    appendTenantFilter(clauses, values);
     const result = await this.pool.query(
       `SELECT id, content, priority FROM knowledge_documents
-       WHERE deleted_at IS NULL AND status IN ('active', 'approved', 'review')
-       ORDER BY created_at DESC`
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY created_at DESC`,
+      values
     );
 
     return result.rows.map((row) => ({
@@ -241,16 +262,23 @@ export class KnowledgeDocumentRepository {
     }));
   }
 
-  async getById(id) {
-    const result = await this.pool.query('SELECT * FROM knowledge_documents WHERE id = $1 LIMIT 1', [
-      id,
-    ]);
+  async getById(id, { bypassTenant = false } = {}) {
+    const clauses = [`id = $1`];
+    const values = [id];
+    if (!bypassTenant) {
+      appendTenantFilter(clauses, values);
+    }
+    const result = await this.pool.query(
+      `SELECT * FROM knowledge_documents WHERE ${clauses.join(' AND ')} LIMIT 1`,
+      values
+    );
     return this.mapDocument(result.rows[0]);
   }
 
   async create(document) {
     const completeness = computeCompleteness(document);
     const quality = computeQuality(document, completeness);
+    const tenant = tenantColumnsForInsert(document);
     await this.pool.query(
       `
         INSERT INTO knowledge_documents (
@@ -260,12 +288,13 @@ export class KnowledgeDocumentRepository {
           view_count, ai_usage_count, approval_count, rejection_count, feedback_score,
           quality_score, completeness_score, last_reviewed_by,
           folder_id, ai_visibility, security_classification, download_count, is_favorite,
-          mime_type, checksum, byte_size, storage_key
+          mime_type, checksum, byte_size, storage_key, tenant_id, organization_id, owner_id,
+          acl_visibility, acl_inherits
         )
         VALUES (
           $1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,
           $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
-          $30,$31,$32,$33,$34,$35,$36,$37,$38
+          $30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43
         )
       `,
       [
@@ -307,6 +336,11 @@ export class KnowledgeDocumentRepository {
         document.checksum || '',
         document.byteSize || 0,
         document.storageKey || '',
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || document.owner || document.author || '',
+        document.aclVisibility || 'organization',
+        document.aclInherits !== false,
       ]
     );
 
@@ -314,6 +348,8 @@ export class KnowledgeDocumentRepository {
   }
 
   async update(id, document) {
+    const current = await this.getById(id);
+    if (!current) return null;
     const completeness = computeCompleteness(document);
     const quality = computeQuality(document, completeness);
     await this.pool.query(
@@ -358,6 +394,9 @@ export class KnowledgeDocumentRepository {
           checksum = $37,
           byte_size = $38,
           storage_key = $39,
+          owner_id = $40,
+          acl_visibility = $41,
+          acl_inherits = $42,
           updated_at = NOW()
         WHERE id = $1
       `,
@@ -401,6 +440,9 @@ export class KnowledgeDocumentRepository {
         document.checksum || '',
         document.byteSize || 0,
         document.storageKey || '',
+        document.ownerId || document.owner || document.author || '',
+        document.aclVisibility || 'organization',
+        document.aclInherits !== false,
       ]
     );
 
@@ -425,18 +467,25 @@ export class KnowledgeDocumentRepository {
   }
 
   async listCollections() {
+    const clauses = [];
+    const values = [];
+    appendTenantFilter(clauses, values);
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
-      'SELECT * FROM knowledge_collections ORDER BY priority DESC, name ASC'
+      `SELECT * FROM knowledge_collections ${where} ORDER BY priority DESC, name ASC`,
+      values
     );
     return result.rows.map((row) => this.mapCollection(row));
   }
 
   async createCollection(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO knowledge_collections (
-        id, name, description, icon, color, owner, status, priority, language
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        id, name, description, icon, color, owner, status, priority, language,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [
         id,
         payload.name,
@@ -447,6 +496,9 @@ export class KnowledgeDocumentRepository {
         payload.status || 'active',
         payload.priority ?? 2,
         payload.language || 'fr',
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.owner || '',
       ]
     );
     const result = await this.pool.query('SELECT * FROM knowledge_collections WHERE id = $1', [id]);
@@ -759,6 +811,11 @@ export class KnowledgeDocumentRepository {
       name: row.name,
       description: row.description || '',
       owner: row.owner || '',
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
+      ownerId: row.owner_id || row.owner || '',
+      aclVisibility: row.acl_visibility || 'organization',
+      aclInherits: row.acl_inherits !== false,
       status: row.status,
       isFavorite: Boolean(row.is_favorite),
       isPinned: Boolean(row.is_pinned),
@@ -771,6 +828,7 @@ export class KnowledgeDocumentRepository {
   async listFolders(filters = {}) {
     const clauses = [];
     const values = [];
+    appendTenantFilter(clauses, values);
     if (!filters.includeDeleted) {
       clauses.push(`status <> 'deleted'`);
     }
@@ -789,18 +847,24 @@ export class KnowledgeDocumentRepository {
   }
 
   async getFolderById(id) {
-    const result = await this.pool.query('SELECT * FROM document_folders WHERE id = $1 LIMIT 1', [
-      id,
-    ]);
+    const clauses = [`id = $1`];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM document_folders WHERE ${clauses.join(' AND ')} LIMIT 1`,
+      values
+    );
     return this.mapFolder(result.rows[0]);
   }
 
   async createFolder(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO document_folders (
-        id, parent_id, name, description, owner, status, is_favorite, is_pinned, sort_order
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        id, parent_id, name, description, owner, status, is_favorite, is_pinned, sort_order,
+        tenant_id, organization_id, owner_id, acl_visibility, acl_inherits
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         id,
         payload.parentId || null,
@@ -811,6 +875,11 @@ export class KnowledgeDocumentRepository {
         Boolean(payload.isFavorite),
         Boolean(payload.isPinned),
         payload.sortOrder ?? 0,
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.owner || '',
+        payload.aclVisibility || 'organization',
+        payload.aclInherits !== false,
       ]
     );
     return this.getFolderById(id);
@@ -823,7 +892,8 @@ export class KnowledgeDocumentRepository {
     await this.pool.query(
       `UPDATE document_folders SET
         parent_id=$2, name=$3, description=$4, owner=$5, status=$6,
-        is_favorite=$7, is_pinned=$8, sort_order=$9, updated_at=NOW()
+        is_favorite=$7, is_pinned=$8, sort_order=$9, owner_id=$10,
+        acl_visibility=$11, acl_inherits=$12, updated_at=NOW()
        WHERE id=$1`,
       [
         id,
@@ -835,6 +905,9 @@ export class KnowledgeDocumentRepository {
         Boolean(next.isFavorite),
         Boolean(next.isPinned),
         next.sortOrder ?? 0,
+        next.ownerId || next.owner || '',
+        next.aclVisibility || 'organization',
+        next.aclInherits !== false,
       ]
     );
     return this.getFolderById(id);
@@ -856,11 +929,12 @@ export class KnowledgeDocumentRepository {
 
   async createDocumentFile(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO knowledge_document_files (
         id, document_id, storage_key, original_name, mime_type, extension, byte_size,
-        checksum, version, ocr_status, virus_scan_status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        checksum, version, ocr_status, virus_scan_status, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         id,
         payload.documentId,
@@ -873,6 +947,9 @@ export class KnowledgeDocumentRepository {
         payload.version || 1,
         payload.ocrStatus || 'pending',
         payload.virusScanStatus || 'pending',
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || '',
       ]
     );
     return this.listDocumentFiles(payload.documentId).then((items) =>
@@ -881,9 +958,12 @@ export class KnowledgeDocumentRepository {
   }
 
   async listDocumentFiles(documentId) {
+    const clauses = [`document_id = $1`];
+    const values = [documentId];
+    appendTenantFilter(clauses, values);
     const result = await this.pool.query(
-      `SELECT * FROM knowledge_document_files WHERE document_id = $1 ORDER BY version DESC, created_at DESC`,
-      [documentId]
+      `SELECT * FROM knowledge_document_files WHERE ${clauses.join(' AND ')} ORDER BY version DESC, created_at DESC`,
+      values
     );
     return result.rows.map((row) => ({
       id: row.id,
@@ -903,9 +983,13 @@ export class KnowledgeDocumentRepository {
 
   async addDmsAudit(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
-      `INSERT INTO dms_audit_events (id, document_id, folder_id, event_type, actor, summary, metadata)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+      `INSERT INTO dms_audit_events (
+        id, document_id, folder_id, event_type, actor, summary, metadata,
+        tenant_id, organization_id, owner_id
+      )
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)`,
       [
         id,
         payload.documentId || null,
@@ -914,6 +998,9 @@ export class KnowledgeDocumentRepository {
         payload.actor || '',
         payload.summary || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.actor || '',
       ]
     );
     return id;
@@ -930,6 +1017,7 @@ export class KnowledgeDocumentRepository {
       values.push(filters.folderId);
       clauses.push(`folder_id = $${values.length}`);
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     values.push(Math.min(Number(filters.limit || 100), 500));
     const result = await this.pool.query(
@@ -950,10 +1038,12 @@ export class KnowledgeDocumentRepository {
 
   async createUploadSession(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO dms_upload_sessions (
-        id, filename, total_chunks, received_chunks, byte_size, checksum, status, actor, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)`,
+        id, filename, total_chunks, received_chunks, byte_size, checksum, status, actor, metadata,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)`,
       [
         id,
         payload.filename || '',
@@ -964,15 +1054,22 @@ export class KnowledgeDocumentRepository {
         payload.status || 'open',
         payload.actor || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.actor || '',
       ]
     );
     return this.getUploadSession(id);
   }
 
   async getUploadSession(id) {
-    const result = await this.pool.query('SELECT * FROM dms_upload_sessions WHERE id = $1 LIMIT 1', [
-      id,
-    ]);
+    const clauses = [`id = $1`];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM dms_upload_sessions WHERE ${clauses.join(' AND ')} LIMIT 1`,
+      values
+    );
     const row = result.rows[0];
     if (!row) return null;
     return {
@@ -1283,6 +1380,7 @@ export class KnowledgeDocumentRepository {
   async listVectorIndexItems({ provider, model, limit = 10000 } = {}) {
     const values = [];
     const filters = [`c.ai_visibility = TRUE`, `c.status = 'indexed'`, `e.status = 'ready'`];
+    appendTenantFilter(filters, values, { alias: 'd' });
     if (provider) {
       values.push(provider);
       filters.push(`e.provider = $${values.length}`);
@@ -1394,15 +1492,15 @@ export class KnowledgeDocumentRepository {
   async findDuplicateContent(contentHashValue, excludeDocumentId = '') {
     if (!contentHashValue) return null;
     const values = [contentHashValue];
-    let extra = '';
+    const filters = [`content_hash = $1`, `deleted_at IS NULL`, `status <> 'deleted'`];
     if (excludeDocumentId) {
       values.push(excludeDocumentId);
-      extra = `AND id <> $${values.length}`;
+      filters.push(`id <> $${values.length}`);
     }
+    appendTenantFilter(filters, values);
     const result = await this.pool.query(
       `SELECT id, title, version FROM knowledge_documents
-       WHERE content_hash = $1 ${extra}
-       AND deleted_at IS NULL AND status <> 'deleted'
+       WHERE ${filters.join(' AND ')}
        ORDER BY updated_at DESC LIMIT 1`,
       values
     );

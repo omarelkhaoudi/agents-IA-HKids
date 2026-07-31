@@ -5,6 +5,7 @@ const adminNav = [
   { to: '/administration/dashboard', label: 'Overview' },
   { to: '/administration/observability', label: 'Observability' },
   { to: '/administration/evaluation', label: 'AI Evaluation' },
+  { to: '/administration/security', label: 'Security' },
   { to: '/administration/agents', label: 'Users & Agents' },
   { to: '/ai-administration', label: 'Providers & Models' },
   { to: '/administration/system-status', label: 'Logs & Security' },

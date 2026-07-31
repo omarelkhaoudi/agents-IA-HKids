@@ -1,54 +1,18 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { ROLES } from '../../constants/roles.js';
 import { env } from '../../config/env.js';
+import { SECRET_NAMES, secretManager } from '../security/SecretManager.js';
 import { logger } from '../../utils/logger.js';
 
-const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const secretsPath = path.join(apiRoot, 'config', 'runtime-secrets.json');
-
 export function loadRuntimeSecrets() {
-  if (!existsSync(secretsPath)) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(readFileSync(secretsPath, 'utf8'));
-  } catch {
-    return {};
-  }
+  return {};
 }
 
 export function applyRuntimeSecretsToEnv() {
-  const secrets = loadRuntimeSecrets();
-
-  if (secrets.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    process.env.ANTHROPIC_API_KEY = secrets.ANTHROPIC_API_KEY;
-    env.anthropicApiKey = secrets.ANTHROPIC_API_KEY;
-  }
-
-  if (secrets.OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
-    process.env.OPENAI_API_KEY = secrets.OPENAI_API_KEY;
-    env.openAiApiKey = secrets.OPENAI_API_KEY;
-  }
-
-  if (secrets.DEFAULT_PROVIDER) {
-    env.defaultProvider = secrets.DEFAULT_PROVIDER;
-  }
-
-  if (secrets.DEFAULT_MODEL) {
-    env.defaultModel = secrets.DEFAULT_MODEL;
-  }
-}
-
-function saveRuntimeSecrets(updates) {
-  const current = loadRuntimeSecrets();
-  const next = { ...current, ...updates };
-  mkdirSync(path.dirname(secretsPath), { recursive: true });
-  writeFileSync(secretsPath, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
-  return next;
+  return {
+    anthropicConfigured: Boolean(secretManager.getProviderConfiguration('anthropic').apiKey),
+    openAiConfigured: Boolean(secretManager.getProviderConfiguration('openai').apiKey),
+  };
 }
 
 export class InstallationService {
@@ -62,13 +26,12 @@ export class InstallationService {
     const settings = await this.systemSettingsService.getSettings();
     const userCount = await this.userRepository.count();
     const setupCompleted = settings.setup_completed === 'true';
-    const secrets = loadRuntimeSecrets();
 
     return {
       requiresSetup: !setupCompleted,
       setupCompleted,
       hasAdministrator: userCount > 0,
-      anthropicConfigured: Boolean(env.anthropicApiKey || secrets.ANTHROPIC_API_KEY),
+      anthropicConfigured: Boolean(secretManager.getProviderConfiguration('anthropic').apiKey),
       defaultProvider: settings.default_provider || env.defaultProvider,
       defaultModel: settings.default_model || env.defaultModel,
       companyName: settings.company_name || '',
@@ -124,13 +87,7 @@ export class InstallationService {
     }
 
     if (anthropicApiKey) {
-      saveRuntimeSecrets({
-        ANTHROPIC_API_KEY: anthropicApiKey,
-        DEFAULT_PROVIDER: defaultProvider,
-        DEFAULT_MODEL: defaultModel,
-      });
-      env.anthropicApiKey = anthropicApiKey;
-      process.env.ANTHROPIC_API_KEY = anthropicApiKey;
+      secretManager.setLocalSecret(SECRET_NAMES.CLAUDE_API_KEY, anthropicApiKey);
     }
 
     env.defaultProvider = defaultProvider;

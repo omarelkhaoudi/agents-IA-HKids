@@ -123,3 +123,99 @@ export interface SystemStatus {
   pendingApprovals: number;
   pendingFeedback: number;
 }
+
+export interface SecurityEvent {
+  id: string;
+  eventType: string;
+  severity: 'info' | 'warning' | 'critical' | string;
+  actorUserId?: string | null;
+  actorEmail: string;
+  tenantId: string;
+  organizationId: string;
+  subjectType: string;
+  subjectId?: string | null;
+  action: string;
+  allowed: boolean;
+  reason: string;
+  ipAddress: string;
+  userAgent: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface SecurityDashboard {
+  generatedAt: string;
+  metrics: {
+    activeSessions: number;
+    failedLogins: number;
+    lockedAccounts: number;
+    tenantViolations: number;
+    permissionViolations: number;
+    securityEvents: number;
+    secretIssues: number;
+    aclEntries: number;
+  };
+  scores: {
+    securityScore: number;
+    permissionScore: number;
+    tenantIsolationScore: number;
+    secretManagementScore: number;
+    authenticationHealth: number;
+    aclQuality: number;
+  };
+  activeSessions: Array<{
+    id: string;
+    userId: string;
+    email: string;
+    name: string;
+    role: string;
+    deviceId: string;
+    ipAddress: string;
+    userAgent: string;
+    tenantId: string;
+    organizationId: string;
+    createdAt: string;
+    lastSeenAt: string;
+    expiresAt: string;
+  }>;
+  lockedAccounts: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    failedLoginCount: number;
+    lockedUntil: string;
+    tenantId: string;
+    organizationId: string;
+  }>;
+  secretHealth: {
+    healthy: number;
+    missing: number;
+    expired: number;
+    items: Array<{
+      name: string;
+      provider: string;
+      configured: boolean;
+      source: string;
+      status: string;
+      required: boolean;
+      lastValidatedAt: string;
+      rotatedAt?: string | null;
+      expiresAt?: string | null;
+    }>;
+  };
+  encryptionHealth: {
+    status: string;
+    configured: boolean;
+    keyId: string;
+    version: number;
+    algorithm: string;
+    rotatedAt?: string | null;
+  };
+  aclStatistics: {
+    entries: number;
+    restrictedDocuments: number;
+    inheritedEntries: number;
+  };
+  events: SecurityEvent[];
+}

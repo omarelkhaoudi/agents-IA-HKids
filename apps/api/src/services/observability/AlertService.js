@@ -1,4 +1,6 @@
 import { env } from '../../config/env.js';
+import { encryptionService } from '../security/EncryptionService.js';
+import { secretManager } from '../security/SecretManager.js';
 
 const MINIMUM_LATENCY_SAMPLE = 3;
 
@@ -17,9 +19,17 @@ function round(value, decimals = 2) {
  * same rule reuses one row keyed by alert_key and auto-resolves once healthy.
  */
 export class AlertService {
-  constructor({ observabilityRepository, systemHealthMonitor, thresholds = {} }) {
+  constructor({
+    observabilityRepository,
+    systemHealthMonitor,
+    thresholds = {},
+    manager = secretManager,
+    encryption = encryptionService,
+  }) {
     this.observabilityRepository = observabilityRepository;
     this.systemHealthMonitor = systemHealthMonitor;
+    this.secretManager = manager;
+    this.encryptionService = encryption;
     this.thresholds = {
       latencyMs: Number(thresholds.latencyMs || env.alertLatencyMs),
       errorRatePercent: Number(thresholds.errorRatePercent || env.alertErrorRatePercent),
@@ -27,6 +37,8 @@ export class AlertService {
       pendingApprovals: Number(thresholds.pendingApprovals || env.alertPendingApprovals),
       failedWorkflows: Number(thresholds.failedWorkflows || env.alertFailedWorkflows),
       retrievalFailures: Number(thresholds.retrievalFailures || env.alertRetrievalFailures),
+      permissionViolations: Number(thresholds.permissionViolations || 3),
+      failedAuthentications: Number(thresholds.failedAuthentications || 5),
     };
   }
 
@@ -39,12 +51,27 @@ export class AlertService {
     const lastHour = new Date(now - 60 * 60 * 1000);
     const lastDay = new Date(now - 24 * 60 * 60 * 1000);
 
-    const [hourSummary, health, approvals, retrievalFailures] = await Promise.all([
+    const [hourSummary, health, approvals, retrievalFailures, permissionViolations, tenantViolations, failedAuthentications] = await Promise.all([
       this.observabilityRepository.getUsageSummary({ since: lastHour }),
       this.systemHealthMonitor.getSystemHealth(),
       this.observabilityRepository.getApprovalStatistics(),
       this.observabilityRepository.countEvents({
         eventType: 'retrieval_failed',
+        since: lastDay,
+      }),
+      this.observabilityRepository.countEvents({
+        category: 'security',
+        eventType: 'permission_denied',
+        since: lastDay,
+      }),
+      this.observabilityRepository.countEvents({
+        category: 'security',
+        eventType: 'tenant_violation',
+        since: lastDay,
+      }),
+      this.observabilityRepository.countEvents({
+        category: 'security',
+        eventType: 'login_failed',
         since: lastDay,
       }),
     ]);
@@ -152,6 +179,78 @@ export class AlertService {
         observedValue: retrievalFailures,
         thresholdValue: this.thresholds.retrievalFailures,
         metadata: { windowHours: 24 },
+      });
+    }
+
+    if (permissionViolations >= this.thresholds.permissionViolations) {
+      candidates.push({
+        alertKey: 'security:permission-violations',
+        ruleCode: 'permission_violation',
+        category: 'security',
+        severity: 'warning',
+        title: 'Permission violations detected',
+        description: `${permissionViolations} permission denials were recorded in the last 24 hours.`,
+        observedValue: permissionViolations,
+        thresholdValue: this.thresholds.permissionViolations,
+        metadata: { windowHours: 24 },
+      });
+    }
+
+    if (tenantViolations > 0) {
+      candidates.push({
+        alertKey: 'security:tenant-violation',
+        ruleCode: 'tenant_violation',
+        category: 'security',
+        severity: 'critical',
+        title: 'Tenant isolation violation',
+        description: `${tenantViolations} tenant isolation violation(s) were recorded in the last 24 hours.`,
+        observedValue: tenantViolations,
+        thresholdValue: 0,
+        metadata: { windowHours: 24 },
+      });
+    }
+
+    if (failedAuthentications >= this.thresholds.failedAuthentications) {
+      candidates.push({
+        alertKey: 'security:failed-authentication',
+        ruleCode: 'failed_authentication',
+        category: 'security',
+        severity: 'warning',
+        title: 'Failed authentication spike',
+        description: `${failedAuthentications} failed login attempts were recorded in the last 24 hours.`,
+        observedValue: failedAuthentications,
+        thresholdValue: this.thresholds.failedAuthentications,
+        metadata: { windowHours: 24 },
+      });
+    }
+
+    const secretHealth = this.secretManager.getSecretHealth();
+    if (secretHealth.missing > 0 || secretHealth.expired > 0) {
+      candidates.push({
+        alertKey: 'security:secret-health',
+        ruleCode: 'expired_secret',
+        category: 'security',
+        severity: secretHealth.expired > 0 ? 'critical' : 'warning',
+        title: 'Secret health requires attention',
+        description: `${secretHealth.missing} missing and ${secretHealth.expired} expired secret(s) detected.`,
+        observedValue: secretHealth.missing + secretHealth.expired,
+        thresholdValue: 0,
+        metadata: { missing: secretHealth.missing, expired: secretHealth.expired },
+      });
+    }
+
+    const encryptionHealth = this.encryptionService.getHealth();
+    if (encryptionHealth.status !== 'healthy') {
+      candidates.push({
+        alertKey: 'security:encryption-key',
+        ruleCode: 'expired_key',
+        category: 'security',
+        severity: 'critical',
+        title: 'Encryption key health degraded',
+        description: 'The encryption service does not have a healthy configured key.',
+        observedValue: 1,
+        thresholdValue: 0,
+        metadata: encryptionHealth,
       });
     }
 

@@ -1,8 +1,10 @@
 import { contentCatalogService } from './content-runtime.js';
+import { documentAclService } from './security-runtime.js';
 
 export const documentManagementService = contentCatalogService.documentManagement;
 
 documentManagementService.refreshCaches = () => contentCatalogService.refreshCaches();
+documentManagementService.documentAclService = documentAclService;
 
 export async function getDmsBootstrap() {
   return documentManagementService.getBootstrap();

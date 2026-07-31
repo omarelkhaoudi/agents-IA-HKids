@@ -63,11 +63,25 @@ export class DocumentManagementService {
     this.knowledgePlatform = options.knowledgePlatform || null;
     this.refreshCaches = options.refreshCaches || (async () => {});
     this.scheduleRefreshIndex = options.scheduleRefreshIndex || (() => {});
+    this.documentAclService = options.documentAclService || null;
     const infra = createDmsInfrastructure(options.infrastructure || {});
     this.storage = infra.storage;
     this.ocr = infra.ocr;
     this.virusScan = infra.virusScan;
     this.maxUploadBytes = infra.maxUploadBytes;
+  }
+
+  async ensureDocumentAccess(document, action, context = {}) {
+    if (!document || !this.documentAclService || !context.user) {
+      return;
+    }
+
+    await this.documentAclService.ensureAccess({
+      user: context.user,
+      tenant: context.tenant,
+      document,
+      action,
+    });
   }
 
   async seedFoldersIfEmpty() {
@@ -307,7 +321,7 @@ export class DocumentManagementService {
     });
   }
 
-  async uploadDocument(payload, actor = '') {
+  async uploadDocument(payload, actor = '', context = {}) {
     const filename = payload.filename || payload.sourceFileName || 'document.bin';
     const buffer = Buffer.from(payload.contentBase64 || '', 'base64');
     const validation = this.validateUpload({
@@ -359,6 +373,7 @@ export class DocumentManagementService {
         error.statusCode = 404;
         throw error;
       }
+      await this.ensureDocumentAccess(existing, 'write', context);
       const nextVersion = Number(existing.version || 1) + 1;
       const stored = await this.storage.save({
         documentId: existing.id,
@@ -480,11 +495,12 @@ export class DocumentManagementService {
     return { document, duplicate: false, virus, ocr };
   }
 
-  async downloadDocument(documentId, actor = '') {
+  async downloadDocument(documentId, actor = '', context = {}) {
     const document = await this.documentRepository.getById(documentId);
     if (!document || document.status === 'deleted') {
       return null;
     }
+    await this.ensureDocumentAccess(document, 'export', context);
     if (!document.storageKey) {
       const error = new Error('No stored binary is available for this document yet.');
       error.statusCode = 404;
@@ -513,11 +529,12 @@ export class DocumentManagementService {
     };
   }
 
-  async moveDocuments(documentIds, folderId, actor = '') {
+  async moveDocuments(documentIds, folderId, actor = '', context = {}) {
     const results = [];
     for (const documentId of documentIds) {
       const existing = await this.documentRepository.getById(documentId);
       if (!existing) continue;
+      await this.ensureDocumentAccess(existing, 'write', context);
       const updated = await this.documentRepository.update(documentId, {
         ...existing,
         folderId: folderId || null,
@@ -537,9 +554,14 @@ export class DocumentManagementService {
     return results;
   }
 
-  async transitionDocument(documentId, action, actor = '', comment = '') {
+  async transitionDocument(documentId, action, actor = '', comment = '', context = {}) {
     const existing = await this.documentRepository.getById(documentId);
     if (!existing) return null;
+    await this.ensureDocumentAccess(
+      existing,
+      ['approve', 'publish'].includes(action) ? 'approve' : 'write',
+      context
+    );
 
     const map = {
       submit: 'review',
@@ -623,9 +645,10 @@ export class DocumentManagementService {
     return this.documentRepository.getById(documentId);
   }
 
-  async getDocumentDetail(documentId) {
+  async getDocumentDetail(documentId, context = {}) {
     const document = await this.documentRepository.getById(documentId);
     if (!document || document.status === 'deleted') return null;
+    await this.ensureDocumentAccess(document, 'read', context);
     const [files, versions, links, events, audit, breadcrumb] = await Promise.all([
       this.documentRepository.listDocumentFiles(documentId),
       this.documentRepository.listVersions(documentId),
@@ -651,6 +674,55 @@ export class DocumentManagementService {
       audit,
       breadcrumb,
     };
+  }
+
+  async getDocumentAcl(documentId, context = {}) {
+    const document = await this.documentRepository.getById(documentId);
+    if (!document || document.status === 'deleted') return null;
+    await this.ensureDocumentAccess(document, 'read', context);
+    const entries = this.documentAclService
+      ? await this.documentAclService.getEffectiveAcl(document)
+      : [];
+    return { document, items: entries };
+  }
+
+  async shareDocument(documentId, payload = {}, actor = '', context = {}) {
+    const document = await this.documentRepository.getById(documentId);
+    if (!document || document.status === 'deleted') return null;
+    await this.ensureDocumentAccess(document, 'owner', context);
+    return this.documentAclService.shareDocument(document, payload, {
+      ...(context.user || {}),
+      email: actor || context.user?.email,
+    });
+  }
+
+  async removeDocumentAclEntry(entryId, actor = '', context = {}) {
+    return this.documentAclService.removeAclEntry(entryId, {
+      ...(context.user || {}),
+      email: actor || context.user?.email,
+    });
+  }
+
+  async updateDocumentVisibility(documentId, payload = {}, actor = '', context = {}) {
+    const document = await this.documentRepository.getById(documentId);
+    if (!document || document.status === 'deleted') return null;
+    await this.ensureDocumentAccess(document, 'owner', context);
+    const updated = await this.documentRepository.update(documentId, {
+      ...document,
+      aclVisibility: payload.aclVisibility || document.aclVisibility || 'organization',
+      aclInherits: payload.aclInherits !== undefined ? payload.aclInherits : document.aclInherits,
+    });
+    await this.documentRepository.addDmsAudit({
+      documentId,
+      eventType: 'acl_visibility_updated',
+      actor,
+      summary: `Updated ACL visibility to ${updated.aclVisibility}`,
+      metadata: {
+        aclVisibility: updated.aclVisibility,
+        aclInherits: updated.aclInherits,
+      },
+    });
+    return updated;
   }
 
   async exportMetadata(format = 'json', filters = {}) {

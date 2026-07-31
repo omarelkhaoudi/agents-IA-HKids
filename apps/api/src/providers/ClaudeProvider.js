@@ -1,18 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../config/env.js';
+import { secretManager } from '../services/security/SecretManager.js';
 
 export class ClaudeProvider {
-  constructor(config = env) {
+  constructor(config = env, manager = secretManager) {
     this.config = config;
+    this.secretManager = manager;
   }
 
   async generateResponse({ model, systemPrompt, messages }) {
-    if (!this.config.anthropicApiKey) {
+    const { apiKey } = this.secretManager.getProviderConfiguration('anthropic');
+    if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY is missing. Claude provider cannot be used yet.');
     }
 
     const client = new Anthropic({
-      apiKey: this.config.anthropicApiKey,
+      apiKey,
     });
 
     const response = await client.messages.create({

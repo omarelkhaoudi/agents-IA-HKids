@@ -5,6 +5,7 @@ import { AuthService } from '../services/auth/AuthService.js';
 import { TokenService } from '../services/auth/TokenService.js';
 import { persistenceService } from './assistant-runtime.js';
 import { databasePool, initializeDatabaseRuntime } from './database-runtime.js';
+import { securityAuditService, securityRepository } from './security-runtime.js';
 
 const userRepository = new UserRepository(databasePool);
 const refreshTokenRepository = new RefreshTokenRepository(databasePool);
@@ -14,6 +15,8 @@ export const authService = new AuthService({
   userRepository,
   refreshTokenRepository,
   tokenService,
+  securityRepository,
+  auditService: securityAuditService,
 });
 
 export async function initializeAuthRuntime() {

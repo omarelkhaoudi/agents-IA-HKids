@@ -10,6 +10,7 @@ import { initializeSalesAgentRuntime } from './runtime/sales-agent-runtime.js';
 import { initializeHrAgentRuntime } from './runtime/hr-agent-runtime.js';
 import { initializeObservabilityRuntime } from './runtime/observability-runtime.js';
 import { initializeEvaluationRuntime } from './runtime/evaluation-runtime.js';
+import { initializeSecurityRuntime } from './runtime/security-runtime.js';
 import { healthService } from './runtime/health-runtime.js';
 import { workflowEngine } from './runtime/workflow-runtime.js';
 import { startServer } from './server.js';
@@ -30,6 +31,7 @@ await initializeCommunityManagerRuntime();
 await initializeSalesAgentRuntime();
 await initializeHrAgentRuntime();
 await initializeObservabilityRuntime();
+await initializeSecurityRuntime();
 await initializeEvaluationRuntime();
 
 const readiness = await healthService.getReadiness();

@@ -4,6 +4,8 @@ import { retrievalService } from '../runtime/assistant-runtime.js';
 import { documentManagementService, wireDmsRuntime } from '../runtime/dms-runtime.js';
 import {
   dmsChunkBodySchema,
+  dmsAclBodySchema,
+  dmsAclVisibilityBodySchema,
   dmsFolderBodySchema,
   dmsImportBodySchema,
   dmsMoveBodySchema,
@@ -22,6 +24,13 @@ wireDmsRuntime({
 
 function actorFrom(request, bodyActor) {
   return bodyActor || request.user?.email || request.user?.name || request.user?.id || '';
+}
+
+function securityContext(request) {
+  return {
+    user: request.user,
+    tenant: request.tenant,
+  };
 }
 
 dmsRouter.get('/dms/bootstrap', async (_request, response) => {
@@ -246,7 +255,8 @@ dmsRouter.post(
     try {
       const result = await documentManagementService.uploadDocument(
         request.body,
-        actorFrom(request)
+        actorFrom(request),
+        securityContext(request)
       );
       response.status(result.duplicate ? 409 : 201).json(result);
     } catch (error) {
@@ -259,7 +269,10 @@ dmsRouter.get(
   '/dms/documents/:id',
   validate({ params: idParamsSchema }),
   async (request, response) => {
-    const detail = await documentManagementService.getDocumentDetail(request.params.id);
+    const detail = await documentManagementService.getDocumentDetail(
+      request.params.id,
+      securityContext(request)
+    );
     if (!detail) {
       response.status(404).json({ message: 'Document not found' });
       return;
@@ -275,7 +288,8 @@ dmsRouter.get(
     try {
       const result = await documentManagementService.downloadDocument(
         request.params.id,
-        actorFrom(request)
+        actorFrom(request),
+        securityContext(request)
       );
       if (!result) {
         response.status(404).json({ message: 'Document not found' });
@@ -289,6 +303,88 @@ dmsRouter.get(
       response.send(result.buffer);
     } catch (error) {
       response.status(error.statusCode || 400).json({ message: error.message });
+    }
+  }
+);
+
+dmsRouter.get(
+  '/dms/documents/:id/acl',
+  validate({ params: idParamsSchema }),
+  async (request, response) => {
+    try {
+      const acl = await documentManagementService.getDocumentAcl(
+        request.params.id,
+        securityContext(request)
+      );
+      if (!acl) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      response.json(acl);
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
+    }
+  }
+);
+
+dmsRouter.post(
+  '/dms/documents/:id/acl',
+  validate({ params: idParamsSchema, body: dmsAclBodySchema }),
+  async (request, response) => {
+    try {
+      const entry = await documentManagementService.shareDocument(
+        request.params.id,
+        request.body,
+        actorFrom(request, request.body.actor),
+        securityContext(request)
+      );
+      if (!entry) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      response.status(201).json(entry);
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
+    }
+  }
+);
+
+dmsRouter.put(
+  '/dms/documents/:id/acl/visibility',
+  validate({ params: idParamsSchema, body: dmsAclVisibilityBodySchema }),
+  async (request, response) => {
+    try {
+      const document = await documentManagementService.updateDocumentVisibility(
+        request.params.id,
+        request.body,
+        actorFrom(request, request.body.actor),
+        securityContext(request)
+      );
+      if (!document) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      response.json(document);
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
+    }
+  }
+);
+
+dmsRouter.delete(
+  '/dms/documents/acl/:id',
+  validate({ params: idParamsSchema }),
+  async (request, response) => {
+    try {
+      response.json(
+        await documentManagementService.removeDocumentAclEntry(
+          request.params.id,
+          actorFrom(request),
+          securityContext(request)
+        )
+      );
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
     }
   }
 );
@@ -312,11 +408,12 @@ dmsRouter.post(
   validate({ body: dmsMoveBodySchema }),
   async (request, response) => {
     response.json(
-      await documentManagementService.moveDocuments(
-        request.body.documentIds,
-        request.body.folderId,
-        actorFrom(request)
-      )
+        await documentManagementService.moveDocuments(
+          request.body.documentIds,
+          request.body.folderId,
+          actorFrom(request),
+          securityContext(request)
+        )
     );
   }
 );
@@ -332,7 +429,8 @@ for (const action of workflowActions) {
           request.params.id,
           action,
           actorFrom(request, request.body.actor),
-          request.body.comment
+          request.body.comment,
+          securityContext(request)
         );
         if (!document) {
           response.status(404).json({ message: 'Document not found' });

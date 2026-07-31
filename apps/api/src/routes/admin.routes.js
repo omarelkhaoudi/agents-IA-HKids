@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { retrievalService } from '../runtime/assistant-runtime.js';
+import { authService } from '../runtime/auth-runtime.js';
 import {
   agentConfigurationService,
   agentManagementService,
@@ -10,10 +11,17 @@ import {
   systemStatusService,
 } from '../runtime/admin-runtime.js';
 import {
+  encryptionService,
+  secretManager,
+  securityDashboardService,
+  securityRepository,
+} from '../runtime/security-runtime.js';
+import {
   createAgentBodySchema,
   exportQuerySchema,
   exportTypeParamsSchema,
   idParamsSchema,
+  secretRotationBodySchema,
   updateAgentBodySchema,
   updateSettingsBodySchema,
   vectorIndexActionBodySchema,
@@ -40,6 +48,54 @@ adminRouter.get('/admin/system-status', async (_request, response) => {
 adminRouter.get('/admin/vector/stats', async (_request, response) => {
   response.json(await retrievalService.getVectorStats());
 });
+
+adminRouter.get('/admin/security', async (_request, response) => {
+  response.json(await securityDashboardService.getDashboard());
+});
+
+adminRouter.get('/admin/security/events', async (request, response) => {
+  response.json({
+    items: await securityRepository.listSecurityEvents({
+      eventType: request.query.eventType,
+      severity: request.query.severity,
+      allowed:
+        request.query.allowed === undefined ? undefined : String(request.query.allowed) === 'true',
+      limit: request.query.limit,
+      offset: request.query.offset,
+    }),
+  });
+});
+
+adminRouter.post('/admin/security/secrets/validate', async (_request, response) => {
+  await securityDashboardService.syncSecretInventory();
+  response.json(secretManager.getSecretHealth());
+});
+
+adminRouter.post(
+  '/admin/security/secrets/:id/rotate',
+  validate({ params: idParamsSchema, body: secretRotationBodySchema }),
+  async (request, response) => {
+    const rotated = secretManager.rotateSecret(request.params.id, request.body.value, {
+      expiresAt: request.body.expiresAt,
+    });
+    await securityDashboardService.syncSecretInventory();
+    response.json(rotated);
+  }
+);
+
+adminRouter.post('/admin/security/encryption/rotate', async (_request, response) => {
+  const rotated = encryptionService.rotateKey();
+  await securityDashboardService.syncEncryptionInventory();
+  response.json(rotated);
+});
+
+adminRouter.post(
+  '/admin/security/users/:id/force-logout',
+  validate({ params: idParamsSchema }),
+  async (request, response) => {
+    response.json(await authService.forceLogout(request.params.id, request.user?.email || 'admin'));
+  }
+);
 
 adminRouter.get(
   '/admin/vector/jobs',

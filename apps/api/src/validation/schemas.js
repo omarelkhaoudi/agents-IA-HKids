@@ -372,6 +372,24 @@ export const dmsWorkflowBodySchema = z.object({
   actor: z.string().trim().max(255).optional(),
 });
 
+export const dmsAclBodySchema = z.object({
+  principalType: z.enum(['user', 'role', 'team', 'organization']),
+  principalId: z.string().trim().min(1).max(255),
+  accessLevel: z.enum(['read', 'write', 'approve', 'export', 'delete', 'owner']).default('read'),
+  permissions: z
+    .array(z.enum(['read', 'write', 'approve', 'export', 'delete', 'owner']))
+    .max(6)
+    .optional(),
+  expiresAt: z.string().trim().max(80).optional().nullable(),
+  actor: z.string().trim().max(255).optional(),
+});
+
+export const dmsAclVisibilityBodySchema = z.object({
+  aclVisibility: z.enum(['private', 'team', 'organization', 'restricted']),
+  aclInherits: z.boolean().optional(),
+  actor: z.string().trim().max(255).optional(),
+});
+
 export const dmsImportBodySchema = z.object({
   items: z
     .array(
@@ -451,6 +469,12 @@ export const updateAgentBodySchema = createAgentBodySchema.partial();
 export const updateSettingsBodySchema = z.object({
   settings: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
 }).or(z.record(z.union([z.string(), z.number(), z.boolean()])));
+
+export const secretRotationBodySchema = z.object({
+  value: z.string().min(1).max(5000),
+  expiresAt: z.string().trim().max(80).optional().nullable(),
+  actor: z.string().trim().max(255).optional(),
+});
 
 export const setupBodySchema = z.object({
   companyName: shortText,

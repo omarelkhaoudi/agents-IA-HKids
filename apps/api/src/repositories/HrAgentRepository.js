@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  appendTenantFilter,
+  tenantColumnsForInsert,
+} from '../services/security/TenantContext.js';
 
 function asJson(value, fallback) {
   if (value == null) return fallback;
@@ -28,6 +32,9 @@ function mapEmployee(row) {
     tags: asJson(row.tags, []),
     notes: row.notes,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -49,6 +56,9 @@ function mapCandidate(row) {
     tags: asJson(row.tags, []),
     notes: row.notes,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -79,6 +89,9 @@ function mapJobDescription(row) {
     updatedAt: row.updated_at,
     approvedAt: row.approved_at,
     approvedBy: row.approved_by,
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
   };
 }
 
@@ -97,6 +110,9 @@ function mapLeave(row) {
     aiRecommendation: row.ai_recommendation,
     managerDecision: row.manager_decision,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -116,6 +132,9 @@ function mapAbsence(row) {
     status: row.status,
     alertFlag: Boolean(row.alert_flag),
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -139,12 +158,25 @@ function mapDocument(row) {
     updatedAt: row.updated_at,
     approvedAt: row.approved_at,
     approvedBy: row.approved_by,
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
   };
 }
 
 export class HrAgentRepository {
   constructor(pool) {
     this.pool = pool;
+  }
+
+  buildTenantWhere() {
+    const clauses = [];
+    const values = [];
+    appendTenantFilter(clauses, values);
+    return {
+      where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+      values,
+    };
   }
 
   async listEmployees(filters = {}) {
@@ -164,6 +196,7 @@ export class HrAgentRepository {
         `(LOWER(full_name) LIKE $${values.length} OR LOWER(email) LIKE $${values.length} OR LOWER(position) LIKE $${values.length})`
       );
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const order = filters.sort === 'name' ? 'full_name ASC' : 'updated_at DESC';
     const result = await this.pool.query(
@@ -175,11 +208,15 @@ export class HrAgentRepository {
 
   async createEmployee(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.email,
+    });
     await this.pool.query(
       `INSERT INTO hr_employees (
         id, full_name, email, phone, department, position, manager_name, employment_type,
-        start_date, status, tags, notes, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb)`,
+        start_date, status, tags, notes, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb,$14,$15,$16)`,
       [
         id,
         payload.fullName,
@@ -194,9 +231,18 @@ export class HrAgentRepository {
         JSON.stringify(payload.tags || []),
         payload.notes || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_employees WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_employees WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapEmployee(result.rows[0]);
   }
 
@@ -226,7 +272,13 @@ export class HrAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_employees WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_employees WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapEmployee(result.rows[0]);
   }
 
@@ -243,6 +295,7 @@ export class HrAgentRepository {
         `(LOWER(full_name) LIKE $${values.length} OR LOWER(position_applied) LIKE $${values.length})`
       );
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM hr_candidates ${where} ORDER BY updated_at DESC`,
@@ -253,11 +306,15 @@ export class HrAgentRepository {
 
   async createCandidate(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.email,
+    });
     await this.pool.query(
       `INSERT INTO hr_candidates (
         id, full_name, email, phone, position_applied, stage, source, evaluation_score,
-        shortlisted, interview_notes, tags, notes, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb)`,
+        shortlisted, interview_notes, tags, notes, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb,$14,$15,$16)`,
       [
         id,
         payload.fullName,
@@ -272,9 +329,18 @@ export class HrAgentRepository {
         JSON.stringify(payload.tags || []),
         payload.notes || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_candidates WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_candidates WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapCandidate(result.rows[0]);
   }
 
@@ -304,25 +370,36 @@ export class HrAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_candidates WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_candidates WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapCandidate(result.rows[0]);
   }
 
   async listJobDescriptions() {
-    const result = await this.pool.query('SELECT * FROM hr_job_descriptions ORDER BY updated_at DESC');
+    const { where, values } = this.buildTenantWhere();
+    const result = await this.pool.query(
+      `SELECT * FROM hr_job_descriptions ${where} ORDER BY updated_at DESC`,
+      values
+    );
     return result.rows.map(mapJobDescription);
   }
 
   async createJobDescription(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO hr_job_descriptions (
         id, title, department, location, contract_type, mission, responsibilities, daily_tasks,
         required_skills, preferred_skills, experience, education, soft_skills, languages,
-        benefits, body, approval_status, metadata
+        benefits, body, approval_status, metadata, tenant_id, organization_id, owner_id
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13::jsonb,$14::jsonb,
-        $15::jsonb,$16,$17,$18::jsonb
+        $15::jsonb,$16,$17,$18::jsonb,$19,$20,$21
       )`,
       [
         id,
@@ -343,9 +420,18 @@ export class HrAgentRepository {
         payload.body || '',
         payload.approvalStatus || 'draft',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_job_descriptions WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_job_descriptions WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapJobDescription(result.rows[0]);
   }
 
@@ -384,7 +470,13 @@ export class HrAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_job_descriptions WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_job_descriptions WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapJobDescription(result.rows[0]);
   }
 
@@ -395,6 +487,7 @@ export class HrAgentRepository {
       values.push(filters.status);
       clauses.push(`status = $${values.length}`);
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM hr_leave_requests ${where} ORDER BY updated_at DESC`,
@@ -405,11 +498,15 @@ export class HrAgentRepository {
 
   async createLeaveRequest(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.employeeId,
+    });
     await this.pool.query(
       `INSERT INTO hr_leave_requests (
         id, employee_id, employee_name, leave_type, start_date, end_date, days, reason,
-        status, ai_recommendation, manager_decision, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`,
+        status, ai_recommendation, manager_decision, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15)`,
       [
         id,
         payload.employeeId || null,
@@ -423,9 +520,18 @@ export class HrAgentRepository {
         payload.aiRecommendation || '',
         payload.managerDecision || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_leave_requests WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_leave_requests WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapLeave(result.rows[0]);
   }
 
@@ -454,22 +560,36 @@ export class HrAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_leave_requests WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_leave_requests WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapLeave(result.rows[0]);
   }
 
   async listAbsences() {
-    const result = await this.pool.query('SELECT * FROM hr_absences ORDER BY updated_at DESC');
+    const { where, values } = this.buildTenantWhere();
+    const result = await this.pool.query(
+      `SELECT * FROM hr_absences ${where} ORDER BY updated_at DESC`,
+      values
+    );
     return result.rows.map(mapAbsence);
   }
 
   async createAbsence(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.employeeId,
+    });
     await this.pool.query(
       `INSERT INTO hr_absences (
         id, employee_id, employee_name, reason, start_date, end_date, duration_days,
-        supporting_docs, status, alert_flag, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)`,
+        supporting_docs, status, alert_flag, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb,$12,$13,$14)`,
       [
         id,
         payload.employeeId || null,
@@ -482,9 +602,18 @@ export class HrAgentRepository {
         payload.status || 'recorded',
         Boolean(payload.alertFlag),
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM hr_absences WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_absences WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapAbsence(result.rows[0]);
   }
 
@@ -499,6 +628,7 @@ export class HrAgentRepository {
       values.push(filters.documentType);
       clauses.push(`document_type = $${values.length}`);
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM hr_documents ${where} ORDER BY updated_at DESC`,
@@ -508,17 +638,24 @@ export class HrAgentRepository {
   }
 
   async getDocument(id) {
-    const result = await this.pool.query('SELECT * FROM hr_documents WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM hr_documents WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapDocument(result.rows[0]);
   }
 
   async createDocument(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO hr_documents (
         id, employee_id, candidate_id, document_type, title, body, approval_status, version,
-        source_prompt, conversation_id, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+        source_prompt, conversation_id, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14)`,
       [
         id,
         payload.employeeId || null,
@@ -531,6 +668,9 @@ export class HrAgentRepository {
         payload.sourcePrompt || '',
         payload.conversationId || null,
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
     return this.getDocument(id);
@@ -611,26 +751,41 @@ export class HrAgentRepository {
 
   async searchAll(query) {
     const q = `%${String(query || '').toLowerCase()}%`;
+    const employeeClauses = ['(LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1)'];
+    const candidateClauses = ['LOWER(full_name) LIKE $1'];
+    const documentClauses = ['LOWER(title) LIKE $1'];
+    const jobClauses = ['LOWER(title) LIKE $1'];
+    const leaveClauses = ['(LOWER(employee_name) LIKE $1 OR LOWER(reason) LIKE $1)'];
+    const employeeValues = [q];
+    const candidateValues = [q];
+    const documentValues = [q];
+    const jobValues = [q];
+    const leaveValues = [q];
+    appendTenantFilter(employeeClauses, employeeValues);
+    appendTenantFilter(candidateClauses, candidateValues);
+    appendTenantFilter(documentClauses, documentValues);
+    appendTenantFilter(jobClauses, jobValues);
+    appendTenantFilter(leaveClauses, leaveValues);
     const [employees, candidates, documents, jobs, leave] = await Promise.all([
       this.pool.query(
-        `SELECT id, full_name AS title, 'employee' AS type FROM hr_employees WHERE LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, full_name AS title, 'employee' AS type FROM hr_employees WHERE ${employeeClauses.join(' AND ')} LIMIT 15`,
+        employeeValues
       ),
       this.pool.query(
-        `SELECT id, full_name AS title, 'candidate' AS type FROM hr_candidates WHERE LOWER(full_name) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, full_name AS title, 'candidate' AS type FROM hr_candidates WHERE ${candidateClauses.join(' AND ')} LIMIT 15`,
+        candidateValues
       ),
       this.pool.query(
-        `SELECT id, title, 'document' AS type FROM hr_documents WHERE LOWER(title) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, title, 'document' AS type FROM hr_documents WHERE ${documentClauses.join(' AND ')} LIMIT 15`,
+        documentValues
       ),
       this.pool.query(
-        `SELECT id, title, 'job_description' AS type FROM hr_job_descriptions WHERE LOWER(title) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, title, 'job_description' AS type FROM hr_job_descriptions WHERE ${jobClauses.join(' AND ')} LIMIT 15`,
+        jobValues
       ),
       this.pool.query(
-        `SELECT id, employee_name AS title, 'leave' AS type FROM hr_leave_requests WHERE LOWER(employee_name) LIKE $1 OR LOWER(reason) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, employee_name AS title, 'leave' AS type FROM hr_leave_requests WHERE ${leaveClauses.join(' AND ')} LIMIT 15`,
+        leaveValues
       ),
     ]);
     return [

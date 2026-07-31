@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { newDb } from 'pg-mem';
+import { SECRET_NAMES, secretManager } from '../services/security/SecretManager.js';
 
 function createInMemoryPool() {
   const db = newDb();
@@ -33,11 +34,11 @@ export function shouldUseInMemoryDatabase({
 }
 
 export function resolveDatabaseConnectionString({
-  databaseUrl = process.env.DATABASE_URL || '',
+  databaseUrl = secretManager.getSecret(SECRET_NAMES.DATABASE_URL),
   dbHost = process.env.DB_HOST || '',
   dbPort = process.env.DB_PORT || '5432',
   dbUser = process.env.DB_USER || '',
-  dbPassword = process.env.DB_PASSWORD || '',
+  dbPassword = secretManager.getSecret(SECRET_NAMES.DB_PASSWORD),
   dbName = process.env.DB_NAME || '',
 } = {}) {
   if (databaseUrl) {

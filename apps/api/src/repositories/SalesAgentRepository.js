@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  appendTenantFilter,
+  tenantColumnsForInsert,
+} from '../services/security/TenantContext.js';
 
 function asJson(value, fallback) {
   if (value == null) return fallback;
@@ -25,6 +29,9 @@ function mapCompany(row) {
     tags: asJson(row.tags, []),
     notes: row.notes,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -46,6 +53,9 @@ function mapProspect(row) {
     assignedUser: row.assigned_user,
     lastActivityAt: row.last_activity_at,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -65,6 +75,9 @@ function mapProduct(row) {
     internalNotes: row.internal_notes,
     knowledgeRefs: asJson(row.knowledge_refs, []),
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -86,6 +99,9 @@ function mapDeal(row) {
     notes: row.notes,
     approvalStatus: row.approval_status,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -119,6 +135,9 @@ function mapQuotation(row) {
     approvedAt: row.approved_at,
     approvedBy: row.approved_by,
     metadata: asJson(row.metadata, {}),
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -139,6 +158,9 @@ function mapDocument(row) {
     updatedAt: row.updated_at,
     approvedAt: row.approved_at,
     approvedBy: row.approved_by,
+    tenantId: row.tenant_id || 'default-tenant',
+    organizationId: row.organization_id || 'default-organization',
+    ownerId: row.owner_id || '',
   };
 }
 
@@ -147,16 +169,34 @@ export class SalesAgentRepository {
     this.pool = pool;
   }
 
+  buildTenantWhere() {
+    const clauses = [];
+    const values = [];
+    appendTenantFilter(clauses, values);
+    return {
+      where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+      values,
+    };
+  }
+
   async listCompanies() {
-    const result = await this.pool.query('SELECT * FROM sales_companies ORDER BY updated_at DESC');
+    const { where, values } = this.buildTenantWhere();
+    const result = await this.pool.query(
+      `SELECT * FROM sales_companies ${where} ORDER BY updated_at DESC`,
+      values
+    );
     return result.rows.map(mapCompany);
   }
 
   async createCompany(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
-      `INSERT INTO sales_companies (id, name, industry, website, phone, email, address, tags, notes, metadata)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10::jsonb)`,
+      `INSERT INTO sales_companies (
+         id, name, industry, website, phone, email, address, tags, notes, metadata,
+         tenant_id, organization_id, owner_id
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10::jsonb,$11,$12,$13)`,
       [
         id,
         payload.name,
@@ -168,9 +208,18 @@ export class SalesAgentRepository {
         JSON.stringify(payload.tags || []),
         payload.notes || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_companies WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_companies WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapCompany(result.rows[0]);
   }
 
@@ -187,6 +236,7 @@ export class SalesAgentRepository {
         `(LOWER(full_name) LIKE $${values.length} OR LOWER(email) LIKE $${values.length} OR LOWER(notes) LIKE $${values.length})`
       );
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM sales_prospects ${where} ORDER BY last_activity_at DESC`,
@@ -197,10 +247,15 @@ export class SalesAgentRepository {
 
   async createProspect(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.assignedUser,
+    });
     await this.pool.query(
       `INSERT INTO sales_prospects (
-        id, company_id, full_name, contact_name, phone, email, status, source, tags, notes, assigned_user, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb)`,
+        id, company_id, full_name, contact_name, phone, email, status, source, tags, notes, assigned_user, metadata,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,$13,$14,$15)`,
       [
         id,
         payload.companyId || null,
@@ -214,9 +269,18 @@ export class SalesAgentRepository {
         payload.notes || '',
         payload.assignedUser || '',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_prospects WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_prospects WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapProspect(result.rows[0]);
   }
 
@@ -245,21 +309,33 @@ export class SalesAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_prospects WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_prospects WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapProspect(result.rows[0]);
   }
 
   async listProducts() {
-    const result = await this.pool.query('SELECT * FROM sales_products ORDER BY name ASC');
+    const { where, values } = this.buildTenantWhere();
+    const result = await this.pool.query(
+      `SELECT * FROM sales_products ${where} ORDER BY name ASC`,
+      values
+    );
     return result.rows.map(mapProduct);
   }
 
   async createProduct(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO sales_products (
-        id, name, category, description, features, unit_price, currency, availability, internal_notes, knowledge_refs, metadata
-      ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11::jsonb)`,
+        id, name, category, description, features, unit_price, currency, availability, internal_notes, knowledge_refs, metadata,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14)`,
       [
         id,
         payload.name,
@@ -272,24 +348,41 @@ export class SalesAgentRepository {
         payload.internalNotes || '',
         JSON.stringify(payload.knowledgeRefs || []),
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_products WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_products WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapProduct(result.rows[0]);
   }
 
   async listDeals() {
-    const result = await this.pool.query('SELECT * FROM sales_deals ORDER BY updated_at DESC');
+    const { where, values } = this.buildTenantWhere();
+    const result = await this.pool.query(
+      `SELECT * FROM sales_deals ${where} ORDER BY updated_at DESC`,
+      values
+    );
     return result.rows.map(mapDeal);
   }
 
   async createDeal(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert({
+      ...payload,
+      ownerId: payload.ownerId || payload.assignedUser,
+    });
     await this.pool.query(
       `INSERT INTO sales_deals (
         id, title, company_id, prospect_id, stage, probability, expected_revenue, expected_close_date,
-        currency, assigned_user, notes, approval_status, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
+        currency, assigned_user, notes, approval_status, metadata, tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16)`,
       [
         id,
         payload.title,
@@ -304,9 +397,18 @@ export class SalesAgentRepository {
         payload.notes || '',
         payload.approvalStatus || 'draft',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_deals WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_deals WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapDeal(result.rows[0]);
   }
 
@@ -336,7 +438,13 @@ export class SalesAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_deals WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_deals WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapDeal(result.rows[0]);
   }
 
@@ -347,6 +455,7 @@ export class SalesAgentRepository {
       values.push(filters.approvalStatus);
       clauses.push(`approval_status = $${values.length}`);
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM sales_quotations ${where} ORDER BY updated_at DESC`,
@@ -356,19 +465,28 @@ export class SalesAgentRepository {
   }
 
   async getQuotation(id) {
-    const result = await this.pool.query('SELECT * FROM sales_quotations WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_quotations WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapQuotation(result.rows[0]);
   }
 
   async createQuotation(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO sales_quotations (
         id, deal_id, company_id, prospect_id, customer_name, title, status, approval_status, currency,
         discount_percent, discount_suggestion, tax_percent, subtotal, tax_amount, total, terms,
-        validity_days, notes, lines, body, source_prompt, conversation_id, metadata
+        validity_days, notes, lines, body, source_prompt, conversation_id, metadata,
+        tenant_id, organization_id, owner_id
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21,$22,$23::jsonb
+        ,$24,$25,$26
       )`,
       [
         id,
@@ -394,6 +512,9 @@ export class SalesAgentRepository {
         payload.sourcePrompt || '',
         payload.conversationId || null,
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
     return this.getQuotation(id);
@@ -449,6 +570,7 @@ export class SalesAgentRepository {
       values.push(filters.approvalStatus);
       clauses.push(`approval_status = $${values.length}`);
     }
+    appendTenantFilter(clauses, values);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
       `SELECT * FROM sales_documents ${where} ORDER BY updated_at DESC`,
@@ -459,10 +581,12 @@ export class SalesAgentRepository {
 
   async createDocument(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO sales_documents (
-        id, deal_id, quotation_id, document_type, title, body, approval_status, metadata
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+        id, deal_id, quotation_id, document_type, title, body, approval_status, metadata,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)`,
       [
         id,
         payload.dealId || null,
@@ -472,9 +596,18 @@ export class SalesAgentRepository {
         payload.body || '',
         payload.approvalStatus || 'draft',
         JSON.stringify(payload.metadata || {}),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId,
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_documents WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_documents WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapDocument(result.rows[0]);
   }
 
@@ -500,7 +633,13 @@ export class SalesAgentRepository {
         JSON.stringify(next.metadata || {}),
       ]
     );
-    const result = await this.pool.query('SELECT * FROM sales_documents WHERE id = $1', [id]);
+    const clauses = ['id = $1'];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM sales_documents WHERE ${clauses.join(' AND ')}`,
+      values
+    );
     return mapDocument(result.rows[0]);
   }
 
@@ -552,26 +691,41 @@ export class SalesAgentRepository {
 
   async searchAll(query) {
     const q = `%${String(query || '').toLowerCase()}%`;
+    const prospectClauses = ['(LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1)'];
+    const companyClauses = ['LOWER(name) LIKE $1'];
+    const dealClauses = ['LOWER(title) LIKE $1'];
+    const productClauses = ['LOWER(name) LIKE $1'];
+    const quotationClauses = ['(LOWER(title) LIKE $1 OR LOWER(customer_name) LIKE $1)'];
+    const prospectValues = [q];
+    const companyValues = [q];
+    const dealValues = [q];
+    const productValues = [q];
+    const quotationValues = [q];
+    appendTenantFilter(prospectClauses, prospectValues);
+    appendTenantFilter(companyClauses, companyValues);
+    appendTenantFilter(dealClauses, dealValues);
+    appendTenantFilter(productClauses, productValues);
+    appendTenantFilter(quotationClauses, quotationValues);
     const [prospects, companies, deals, products, quotations] = await Promise.all([
       this.pool.query(
-        `SELECT id, full_name AS title, 'prospect' AS type FROM sales_prospects WHERE LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, full_name AS title, 'prospect' AS type FROM sales_prospects WHERE ${prospectClauses.join(' AND ')} LIMIT 15`,
+        prospectValues
       ),
       this.pool.query(
-        `SELECT id, name AS title, 'company' AS type FROM sales_companies WHERE LOWER(name) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, name AS title, 'company' AS type FROM sales_companies WHERE ${companyClauses.join(' AND ')} LIMIT 15`,
+        companyValues
       ),
       this.pool.query(
-        `SELECT id, title, 'deal' AS type FROM sales_deals WHERE LOWER(title) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, title, 'deal' AS type FROM sales_deals WHERE ${dealClauses.join(' AND ')} LIMIT 15`,
+        dealValues
       ),
       this.pool.query(
-        `SELECT id, name AS title, 'product' AS type FROM sales_products WHERE LOWER(name) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, name AS title, 'product' AS type FROM sales_products WHERE ${productClauses.join(' AND ')} LIMIT 15`,
+        productValues
       ),
       this.pool.query(
-        `SELECT id, title, 'quotation' AS type FROM sales_quotations WHERE LOWER(title) LIKE $1 OR LOWER(customer_name) LIKE $1 LIMIT 15`,
-        [q]
+        `SELECT id, title, 'quotation' AS type FROM sales_quotations WHERE ${quotationClauses.join(' AND ')} LIMIT 15`,
+        quotationValues
       ),
     ]);
     return [

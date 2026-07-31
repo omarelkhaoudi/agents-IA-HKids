@@ -129,6 +129,7 @@ export class EvaluationService {
     promptEvaluationService,
     agentBenchmarkService,
     observabilityService = null,
+    securityDashboardService = null,
   }) {
     this.evaluationRepository = evaluationRepository;
     this.evaluationEngine = evaluationEngine;
@@ -137,6 +138,7 @@ export class EvaluationService {
     this.promptEvaluationService = promptEvaluationService;
     this.agentBenchmarkService = agentBenchmarkService;
     this.observabilityService = observabilityService;
+    this.securityDashboardService = securityDashboardService;
   }
 
   async recordEvaluation(input = {}) {
@@ -423,20 +425,38 @@ export class EvaluationService {
   }
 
   async getOverview({ days = 30 } = {}) {
-    const [dashboard, benchmark, workflow, suites] = await Promise.all([
+    const [dashboard, benchmark, workflow, suites, security] = await Promise.all([
       this.getDashboard({ days }),
       this.agentBenchmarkService.getBenchmark({ days }),
       this.workflowEvaluationService.getWorkflowQuality({ days }),
       this.evaluationRepository.getLatestSuiteRuns(10),
+      this.getSecurityEvaluation(),
     ]);
 
     return {
       ...dashboard,
       benchmark: benchmark.agents,
       workflow,
+      security,
       recentSuiteRuns: suites,
       criteriaCatalog: this.evaluationEngine.getCriteria(),
       thresholds: this.evaluationEngine.getThresholds(),
     };
+  }
+
+  async getSecurityEvaluation() {
+    if (!this.securityDashboardService) {
+      return {
+        securityScore: 0,
+        permissionScore: 0,
+        tenantIsolationScore: 0,
+        secretManagementScore: 0,
+        authenticationHealth: 0,
+        aclQuality: 0,
+        unavailable: true,
+      };
+    }
+
+    return this.securityDashboardService.getEvaluationScore();
   }
 }

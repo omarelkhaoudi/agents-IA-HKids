@@ -1,4 +1,5 @@
 import { hasMinimumRole, isWriteMethod, ROLES } from '../constants/roles.js';
+import { securityAuditService } from '../runtime/security-runtime.js';
 
 const ADMIN_PREFIX = '/admin';
 const AI_PREFIX = '/ai';
@@ -30,6 +31,22 @@ function getPath(request) {
 }
 
 function deny(response, message = 'You do not have permission to perform this action.') {
+  const request = response.req;
+  void securityAuditService
+    .record({
+      user: request?.user,
+      tenant: request?.tenant,
+      eventType: 'permission_denied',
+      severity: 'warning',
+      subjectType: 'route',
+      subjectId: getPath(request || {}),
+      action: request?.method || '',
+      allowed: false,
+      reason: 'route_rbac_denied',
+      ipAddress: request?.ip || '',
+      userAgent: request?.get?.('user-agent') || '',
+    })
+    .catch(() => undefined);
   response.status(403).json({ message });
 }
 

@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { SECRET_NAMES, secretManager } from '../security/SecretManager.js';
 import { logger } from '../../utils/logger.js';
 
 export class SystemStatusService {
@@ -121,7 +122,7 @@ export class SystemStatusService {
   validateEnvironment() {
     const issues = [];
 
-    if (!env.jwtSecret) {
+    if (!secretManager.getSecret(SECRET_NAMES.JWT_SECRET)) {
       issues.push('JWT_SECRET is missing');
     }
 
@@ -133,7 +134,7 @@ export class SystemStatusService {
       issues.push('CLIENT_URL must not use localhost in production');
     }
 
-    if (!env.anthropicApiKey) {
+    if (!secretManager.getProviderConfiguration('anthropic').apiKey) {
       issues.push('ANTHROPIC_API_KEY is not configured');
     }
 
@@ -149,7 +150,7 @@ export class SystemStatusService {
       defaultModel: env.defaultModel,
       clientUrl: env.clientUrl,
       databaseConfigured: Boolean(env.databaseUrl),
-      anthropicConfigured: Boolean(env.anthropicApiKey),
+      anthropicConfigured: Boolean(secretManager.getProviderConfiguration('anthropic').apiKey),
     };
   }
 
@@ -165,9 +166,10 @@ export class SystemStatusService {
     ]);
 
     const environment = this.validateEnvironment();
+    const anthropicConfigured = Boolean(secretManager.getProviderConfiguration('anthropic').apiKey);
     const claudeApi = {
-      status: env.anthropicApiKey ? health.checks.aiGateway.status : 'unconfigured',
-      configured: Boolean(env.anthropicApiKey),
+      status: anthropicConfigured ? health.checks.aiGateway.status : 'unconfigured',
+      configured: anthropicConfigured,
       provider: settings.default_provider || env.defaultProvider,
       model: settings.default_model || env.defaultModel,
     };

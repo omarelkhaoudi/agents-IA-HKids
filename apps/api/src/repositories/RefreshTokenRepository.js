@@ -11,16 +11,38 @@ export class RefreshTokenRepository {
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       revokedAt: row.revoked_at,
+      deviceId: row.device_id || '',
+      ipAddress: row.ip_address || '',
+      userAgent: row.user_agent || '',
+      tokenVersion: Number(row.token_version || 0),
+      rotatedFromTokenId: row.rotated_from_token_id || null,
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
     };
   }
 
   async create(payload) {
     await this.pool.query(
       `
-        INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO refresh_tokens (
+          id, user_id, token_hash, expires_at, device_id, ip_address, user_agent,
+          token_version, rotated_from_token_id, tenant_id, organization_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `,
-      [payload.id, payload.userId, payload.tokenHash, payload.expiresAt]
+      [
+        payload.id,
+        payload.userId,
+        payload.tokenHash,
+        payload.expiresAt,
+        payload.deviceId || '',
+        payload.ipAddress || '',
+        payload.userAgent || '',
+        payload.tokenVersion || 0,
+        payload.rotatedFromTokenId || null,
+        payload.tenantId || 'default-tenant',
+        payload.organizationId || 'default-organization',
+      ]
     );
 
     return this.findById(payload.id);

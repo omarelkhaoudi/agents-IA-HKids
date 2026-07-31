@@ -1,8 +1,21 @@
 import { TokenService } from '../services/auth/TokenService.js';
+import { authService } from '../runtime/auth-runtime.js';
 
 const tokenService = new TokenService();
 
-export function authenticate(request, response, next) {
+function mapUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+    tokenVersion: user.tokenVersion,
+    tenantId: user.tenantId || 'default-tenant',
+    organizationId: user.organizationId || 'default-organization',
+  };
+}
+
+export async function authenticate(request, response, next) {
   const authorization = request.headers.authorization || '';
   const [scheme, token] = authorization.split(' ');
 
@@ -13,12 +26,8 @@ export function authenticate(request, response, next) {
 
   try {
     const payload = tokenService.verifyAccessToken(token);
-    request.user = {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      name: payload.name,
-    };
+    const user = await authService.validateAccessPayload(payload);
+    request.user = mapUser(user);
     next();
   } catch (error) {
     if (error instanceof Error && error.name === 'TokenExpiredError') {
@@ -37,12 +46,8 @@ export async function optionalAuthenticate(request, _response, next) {
   if (scheme === 'Bearer' && token) {
     try {
       const payload = tokenService.verifyAccessToken(token);
-      request.user = {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-        name: payload.name,
-      };
+      const user = await authService.validateAccessPayload(payload);
+      request.user = mapUser(user);
     } catch {
       // Ignore invalid optional tokens.
     }

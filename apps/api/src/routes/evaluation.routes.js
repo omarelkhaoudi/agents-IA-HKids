@@ -192,6 +192,10 @@ evaluationRouter.get(
   }
 );
 
+evaluationRouter.get('/evaluation/security', async (_request, response) => {
+  response.json(await evaluationService.getSecurityEvaluation());
+});
+
 evaluationRouter.get(
   '/evaluation/suites',
   validate({ query: evaluationSuitesQuerySchema }),

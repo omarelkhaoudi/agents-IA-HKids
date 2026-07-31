@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { retrievalService } from '../runtime/assistant-runtime.js';
 import { knowledgePlatformService } from '../runtime/knowledge-runtime.js';
+import { documentAclService } from '../runtime/security-runtime.js';
 import {
   documentBodySchema,
   idParamsSchema,
@@ -25,6 +26,20 @@ knowledgePlatformService.scheduleRefreshIndex = () => retrievalService.scheduleR
 
 function actorFrom(request, bodyActor) {
   return bodyActor || request.user?.email || request.user?.name || request.user?.id || '';
+}
+
+async function ensureDocumentAccess(request, documentId, action) {
+  const document = await knowledgePlatformService.documentRepository.getById(documentId);
+  if (!document || document.status === 'deleted') {
+    return null;
+  }
+  await documentAclService.ensureAccess({
+    user: request.user,
+    tenant: request.tenant,
+    document,
+    action,
+  });
+  return document;
 }
 
 knowledgeRouter.get('/knowledge/bootstrap', async (_request, response) => {
@@ -154,12 +169,17 @@ knowledgeRouter.put(
 );
 
 knowledgeRouter.get('/knowledge/documents/:id', validate({ params: idParamsSchema }), async (request, response) => {
-  const detail = await knowledgePlatformService.getDocumentDetail(request.params.id);
-  if (!detail) {
-    response.status(404).json({ message: 'Document not found' });
-    return;
+  try {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'read');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
+    const detail = await knowledgePlatformService.getDocumentDetail(request.params.id);
+    response.json(detail);
+  } catch (error) {
+    response.status(error.statusCode || 403).json({ message: error.message });
   }
-  response.json(detail);
 });
 
 knowledgeRouter.post(
@@ -178,17 +198,22 @@ knowledgeRouter.put(
   '/knowledge/documents/:id',
   validate({ params: idParamsSchema, body: documentBodySchema.partial() }),
   async (request, response) => {
-    const document = await knowledgePlatformService.updateDocument(
-      request.params.id,
-      request.body,
-      actorFrom(request),
-      { changeSummary: request.body.notes ? 'Updated with notes' : 'Document updated' }
-    );
-    if (!document) {
-      response.status(404).json({ message: 'Document not found' });
-      return;
+    try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      const document = await knowledgePlatformService.updateDocument(
+        request.params.id,
+        request.body,
+        actorFrom(request),
+        { changeSummary: request.body.notes ? 'Updated with notes' : 'Document updated' }
+      );
+      response.json(document);
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
     }
-    response.json(document);
   }
 );
 
@@ -196,15 +221,24 @@ knowledgeRouter.delete(
   '/knowledge/documents/:id',
   validate({ params: idParamsSchema }),
   async (request, response) => {
-    const deleted = await knowledgePlatformService.removeDocument(
-      request.params.id,
-      actorFrom(request)
-    );
-    if (!deleted) {
-      response.status(404).json({ message: 'Document not found' });
-      return;
+    try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'delete');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      const deleted = await knowledgePlatformService.removeDocument(
+        request.params.id,
+        actorFrom(request)
+      );
+      if (!deleted) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      response.status(204).send();
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
     }
-    response.status(204).send();
   }
 );
 
@@ -213,6 +247,11 @@ knowledgeRouter.post(
   validate({ params: idParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
     try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
       response.json(
         await knowledgePlatformService.submitForReview(
           request.params.id,
@@ -231,6 +270,11 @@ knowledgeRouter.post(
   validate({ params: idParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
     try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'approve');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
       response.json(
         await knowledgePlatformService.publishDocument(
           request.params.id,
@@ -249,6 +293,11 @@ knowledgeRouter.post(
   validate({ params: idParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
     try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'approve');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
       response.json(
         await knowledgePlatformService.requestCorrections(
           request.params.id,
@@ -267,6 +316,11 @@ knowledgeRouter.post(
   validate({ params: idParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
     try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
       response.json(
         await knowledgePlatformService.archiveDocument(
           request.params.id,
@@ -284,7 +338,16 @@ knowledgeRouter.get(
   '/knowledge/documents/:id/versions',
   validate({ params: idParamsSchema }),
   async (request, response) => {
-    response.json({ items: await knowledgePlatformService.listVersions(request.params.id) });
+    try {
+      const allowed = await ensureDocumentAccess(request, request.params.id, 'read');
+      if (!allowed) {
+        response.status(404).json({ message: 'Document not found' });
+        return;
+      }
+      response.json({ items: await knowledgePlatformService.listVersions(request.params.id) });
+    } catch (error) {
+      response.status(error.statusCode || 403).json({ message: error.message });
+    }
   }
 );
 
@@ -292,6 +355,11 @@ knowledgeRouter.post(
   '/knowledge/documents/:id/reindex',
   validate({ params: idParamsSchema, body: vectorIndexActionBodySchema.partial() }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     response.status(202).json(
       await retrievalService.reindexDocument(request.params.id, {
         actor: actorFrom(request, request.body.actor),
@@ -320,6 +388,11 @@ knowledgeRouter.get(
   '/knowledge/documents/:id/versions/compare',
   validate({ params: idParamsSchema, query: knowledgeCompareQuerySchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'read');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     const comparison = await knowledgePlatformService.compareVersions(
       request.params.id,
       request.query.left,
@@ -337,6 +410,11 @@ knowledgeRouter.post(
   '/knowledge/documents/:id/versions/:version/restore',
   validate({ params: knowledgeVersionParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     const document = await knowledgePlatformService.restoreVersion(
       request.params.id,
       request.params.version,
@@ -354,6 +432,11 @@ knowledgeRouter.post(
   '/knowledge/documents/:id/versions/:version/duplicate',
   validate({ params: knowledgeVersionParamsSchema, body: knowledgeReviewBodySchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'read');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     const document = await knowledgePlatformService.duplicateVersion(
       request.params.id,
       request.params.version,
@@ -371,6 +454,11 @@ knowledgeRouter.get(
   '/knowledge/documents/:id/links',
   validate({ params: idParamsSchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'read');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     response.json({ items: await knowledgePlatformService.listLinks(request.params.id) });
   }
 );
@@ -379,6 +467,11 @@ knowledgeRouter.post(
   '/knowledge/documents/:id/links',
   validate({ params: idParamsSchema, body: knowledgeLinkBodySchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     response.status(201).json(
       await knowledgePlatformService.addLink(
         {
@@ -395,6 +488,11 @@ knowledgeRouter.delete(
   '/knowledge/documents/:id/links/:linkId',
   validate({ params: knowledgeLinkParamsSchema }),
   async (request, response) => {
+    const allowed = await ensureDocumentAccess(request, request.params.id, 'write');
+    if (!allowed) {
+      response.status(404).json({ message: 'Document not found' });
+      return;
+    }
     const removed = await knowledgePlatformService.removeLink(
       request.params.linkId,
       request.params.id,

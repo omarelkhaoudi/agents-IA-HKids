@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  appendTenantFilter,
+  tenantColumnsForInsert,
+} from '../services/security/TenantContext.js';
 
 function asJson(value, fallback) {
   if (value == null) return fallback;
@@ -88,6 +92,9 @@ export class PromptDefinitionRepository {
       lastReviewedBy: row.last_reviewed_by || '',
       publishedAt: row.published_at || null,
       averageLatencyMs: Number(row.average_latency_ms || 0),
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
+      ownerId: row.owner_id || row.owner || row.author || '',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -131,6 +138,9 @@ export class PromptDefinitionRepository {
       name: row.name,
       description: row.description,
       owner: row.owner,
+      tenantId: row.tenant_id || 'default-tenant',
+      organizationId: row.organization_id || 'default-organization',
+      ownerId: row.owner_id || row.owner || '',
       status: row.status,
       language: row.language,
       priority: row.priority,
@@ -142,13 +152,21 @@ export class PromptDefinitionRepository {
   }
 
   async count() {
-    const result = await this.pool.query('SELECT COUNT(*)::int AS count FROM prompt_definitions');
+    const clauses = [];
+    const values = [];
+    appendTenantFilter(clauses, values);
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await this.pool.query(
+      `SELECT COUNT(*)::int AS count FROM prompt_definitions ${where}`,
+      values
+    );
     return result.rows[0]?.count || 0;
   }
 
   async list(filters = {}) {
     const clauses = [];
     const values = [];
+    appendTenantFilter(clauses, values);
 
     if (filters.status) {
       values.push(filters.status);
@@ -211,15 +229,20 @@ export class PromptDefinitionRepository {
   }
 
   async getById(id) {
-    const result = await this.pool.query('SELECT * FROM prompt_definitions WHERE id = $1 LIMIT 1', [
-      id,
-    ]);
+    const clauses = [`id = $1`];
+    const values = [id];
+    appendTenantFilter(clauses, values);
+    const result = await this.pool.query(
+      `SELECT * FROM prompt_definitions WHERE ${clauses.join(' AND ')} LIMIT 1`,
+      values
+    );
     return this.mapPrompt(result.rows[0]);
   }
 
   async create(prompt) {
     const completeness = computeCompleteness(prompt);
     const quality = computeQuality(prompt, completeness);
+    const tenant = tenantColumnsForInsert(prompt);
     await this.pool.query(
       `
         INSERT INTO prompt_definitions (
@@ -228,12 +251,12 @@ export class PromptDefinitionRepository {
           library_id, category, tags, language, owner, author, priority, agent_code,
           target_model, temperature, max_tokens, knowledge_collection_ids, notes,
           usage_count, success_count, approval_count, rejection_count, feedback_score,
-          quality_score, completeness_score, last_reviewed_by
+          quality_score, completeness_score, last_reviewed_by, tenant_id, organization_id, owner_id
         )
         VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,
           $15,$16,$17::jsonb,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27,
-          $28,$29,$30,$31,$32,$33,$34,$35
+          $28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38
         )
       `,
       [
@@ -272,6 +295,9 @@ export class PromptDefinitionRepository {
         quality,
         completeness,
         prompt.lastReviewedBy || '',
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || prompt.owner || prompt.author || '',
       ]
     );
 
@@ -279,6 +305,8 @@ export class PromptDefinitionRepository {
   }
 
   async update(id, prompt) {
+    const current = await this.getById(id);
+    if (!current) return null;
     const completeness = computeCompleteness(prompt);
     const quality = computeQuality(prompt, completeness);
     await this.pool.query(
@@ -322,6 +350,7 @@ export class PromptDefinitionRepository {
           last_reviewed_by = $36,
           published_at = $37,
           average_latency_ms = $38,
+          owner_id = $39,
           updated_at = NOW()
         WHERE id = $1
       `,
@@ -364,6 +393,7 @@ export class PromptDefinitionRepository {
         prompt.lastReviewedBy || '',
         prompt.publishedAt || null,
         prompt.averageLatencyMs || 0,
+        prompt.ownerId || prompt.owner || prompt.author || '',
       ]
     );
 
@@ -371,23 +401,32 @@ export class PromptDefinitionRepository {
   }
 
   async remove(id) {
+    const existing = await this.getById(id);
+    if (!existing) return false;
     const result = await this.pool.query('DELETE FROM prompt_definitions WHERE id = $1', [id]);
     return result.rowCount > 0;
   }
 
   async listLibraries() {
+    const clauses = [];
+    const values = [];
+    appendTenantFilter(clauses, values);
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.pool.query(
-      'SELECT * FROM prompt_libraries ORDER BY priority DESC, name ASC'
+      `SELECT * FROM prompt_libraries ${where} ORDER BY priority DESC, name ASC`,
+      values
     );
     return result.rows.map((row) => this.mapLibrary(row));
   }
 
   async createLibrary(payload) {
     const id = payload.id || randomUUID();
+    const tenant = tenantColumnsForInsert(payload);
     await this.pool.query(
       `INSERT INTO prompt_libraries (
-        id, name, description, owner, status, language, priority, version, tags
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)`,
+        id, name, description, owner, status, language, priority, version, tags,
+        tenant_id, organization_id, owner_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)`,
       [
         id,
         payload.name,
@@ -398,6 +437,9 @@ export class PromptDefinitionRepository {
         payload.priority ?? 2,
         payload.version || 1,
         JSON.stringify(payload.tags || []),
+        tenant.tenantId,
+        tenant.organizationId,
+        tenant.ownerId || payload.owner || '',
       ]
     );
     const result = await this.pool.query('SELECT * FROM prompt_libraries WHERE id = $1', [id]);
@@ -411,7 +453,7 @@ export class PromptDefinitionRepository {
     await this.pool.query(
       `UPDATE prompt_libraries SET
         name=$2, description=$3, owner=$4, status=$5, language=$6, priority=$7,
-        version=$8, tags=$9::jsonb, updated_at=NOW()
+        version=$8, tags=$9::jsonb, owner_id=$10, updated_at=NOW()
        WHERE id=$1`,
       [
         id,
@@ -423,6 +465,7 @@ export class PromptDefinitionRepository {
         next.priority ?? 2,
         next.version || 1,
         JSON.stringify(next.tags || []),
+        next.ownerId || next.owner || '',
       ]
     );
     const result = await this.pool.query('SELECT * FROM prompt_libraries WHERE id = $1', [id]);

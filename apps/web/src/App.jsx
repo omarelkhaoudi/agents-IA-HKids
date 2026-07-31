@@ -11,6 +11,7 @@ import AdminDashboardPage from './pages/administration/AdminDashboardPage';
 import AdminExportsPage from './pages/administration/AdminExportsPage';
 import AdminObservabilityPage from './pages/administration/AdminObservabilityPage';
 import AdminSettingsPage from './pages/administration/AdminSettingsPage';
+import AdminSecurityPage from './pages/administration/AdminSecurityPage';
 import AdminStatisticsPage from './pages/administration/AdminStatisticsPage';
 import AdminSystemStatusPage from './pages/administration/AdminSystemStatusPage';
 import CommunityManagerPage from './pages/CommunityManagerPage';
@@ -87,6 +88,7 @@ export default function App() {
               <Route path="dashboard" element={<AdminDashboardPage />} />
               <Route path="observability" element={<AdminObservabilityPage />} />
               <Route path="evaluation" element={<AdminAiEvaluationPage />} />
+              <Route path="security" element={<AdminSecurityPage />} />
               <Route path="system-status" element={<AdminSystemStatusPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
               <Route path="agents" element={<AdminAgentsPage />} />

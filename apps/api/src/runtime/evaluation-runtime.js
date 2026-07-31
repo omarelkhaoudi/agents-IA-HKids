@@ -13,6 +13,7 @@ import { PromptEvaluationService } from '../services/evaluation/PromptEvaluation
 import { WorkflowEvaluationService } from '../services/evaluation/WorkflowEvaluationService.js';
 import { aiGateway, persistenceService } from './assistant-runtime.js';
 import { observabilityService } from './observability-runtime.js';
+import { securityDashboardService } from './security-runtime.js';
 import { logger } from '../utils/logger.js';
 
 const evaluationRepository = new EvaluationRepository(persistenceService.pool);
@@ -42,6 +43,7 @@ export const evaluationService = new EvaluationService({
   promptEvaluationService,
   agentBenchmarkService,
   observabilityService,
+  securityDashboardService,
 });
 
 export const evaluationSuiteService = new EvaluationSuiteService({
