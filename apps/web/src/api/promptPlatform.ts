@@ -102,7 +102,7 @@ export async function restorePromptPlatform(promptId: string, comment = '') {
 }
 
 export async function duplicatePromptPlatform(promptId: string) {
-  return apiRequest(`/api/prompt-platform/prompts/${promptId}/duplicate`, {
+  return apiRequest<PromptDefinition>(`/api/prompt-platform/prompts/${promptId}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({}),
   });

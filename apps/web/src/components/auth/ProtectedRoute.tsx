@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import type { AuthUser } from '../types/auth';
+import type { AuthUser } from '../../types/auth';
 
 interface ProtectedRouteProps {
   minRole?: AuthUser['role'];

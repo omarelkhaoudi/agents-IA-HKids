@@ -37,7 +37,7 @@ Use this checklist when handing over the H-Kids Administrative AI Assistant to t
 ## Database
 
 - [ ] PostgreSQL 16 provisioned (or Compose `db` service)
-- [ ] Migrations `001`–`009` applied (`schema_migrations` populated on API start)
+- [ ] Migrations `001`–`020` applied (`schema_migrations` populated on API start)
 - [ ] Seeded agents, prompts, and knowledge documents reviewed
 - [ ] Connectivity from API confirmed (`/api/ready`)
 
@@ -83,7 +83,7 @@ Use this checklist when handing over the H-Kids Administrative AI Assistant to t
 ## Dependencies
 
 - [ ] `npm install` succeeds on target Node 20+
-- [ ] `npm run build` and `npm test` pass on delivery commit
+- [ ] `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` pass on delivery commit
 - [ ] Docker images build (`apps/api/Dockerfile`, `apps/web/Dockerfile`) if used
 - [ ] PostgreSQL client tools available where backups run
 

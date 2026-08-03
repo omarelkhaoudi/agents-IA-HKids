@@ -1,8 +1,22 @@
 import { apiRequest } from './client';
 import type { VectorIndexAction, VectorIndexJob, VectorKnowledgeStats } from '../types/knowledge-base';
 
+interface EntityResult {
+  id: string;
+}
+
+interface DmsUploadSession {
+  id: string;
+}
+
+interface DmsUploadResult {
+  duplicate?: boolean;
+  matches?: EntityResult[];
+  document?: EntityResult;
+}
+
 export async function getDmsBootstrap() {
-  return apiRequest('/api/dms/bootstrap');
+  return apiRequest<Record<string, any>>('/api/dms/bootstrap');
 }
 
 export async function getDmsVectorStats(): Promise<VectorKnowledgeStats> {
@@ -18,14 +32,14 @@ export async function searchDms(params: Record<string, string | number | undefin
 }
 
 export async function createDmsFolder(payload: Record<string, unknown>) {
-  return apiRequest('/api/dms/folders', {
+  return apiRequest<EntityResult>('/api/dms/folders', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateDmsFolder(folderId: string, payload: Record<string, unknown>) {
-  return apiRequest(`/api/dms/folders/${folderId}`, {
+  return apiRequest<EntityResult>(`/api/dms/folders/${folderId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
@@ -36,21 +50,21 @@ export async function getDmsFolderBreadcrumb(folderId: string) {
 }
 
 export async function uploadDmsDocument(payload: Record<string, unknown>) {
-  return apiRequest('/api/dms/uploads', {
+  return apiRequest<DmsUploadResult>('/api/dms/uploads', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function startDmsUploadSession(payload: Record<string, unknown>) {
-  return apiRequest('/api/dms/uploads/sessions', {
+  return apiRequest<DmsUploadSession>('/api/dms/uploads/sessions', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function getDmsDocumentDetail(documentId: string) {
-  return apiRequest(`/api/dms/documents/${documentId}`);
+  return apiRequest<Record<string, any>>(`/api/dms/documents/${documentId}`);
 }
 
 export async function reindexDmsDocument(
@@ -64,7 +78,7 @@ export async function reindexDmsDocument(
 }
 
 export async function moveDmsDocuments(documentIds: string[], folderId?: string | null) {
-  return apiRequest('/api/dms/documents/move', {
+  return apiRequest<{ moved: number; items?: EntityResult[] }>('/api/dms/documents/move', {
     method: 'POST',
     body: JSON.stringify({ documentIds, folderId }),
   });
@@ -75,7 +89,7 @@ export async function runDmsWorkflow(
   action: 'submit' | 'approve' | 'publish' | 'corrections' | 'archive' | 'restore',
   comment = ''
 ) {
-  return apiRequest(`/api/dms/documents/${documentId}/${action}`, {
+  return apiRequest<EntityResult>(`/api/dms/documents/${documentId}/${action}`, {
     method: 'POST',
     body: JSON.stringify({ comment }),
   });
@@ -85,7 +99,7 @@ export async function exportDmsMetadata(format: 'json' | 'csv' = 'json') {
   if (format === 'csv') {
     return apiRequest<string>('/api/dms/export?format=csv');
   }
-  return apiRequest('/api/dms/export?format=json');
+  return apiRequest<Record<string, unknown>>('/api/dms/export?format=json');
 }
 
 export async function getDmsAudit() {

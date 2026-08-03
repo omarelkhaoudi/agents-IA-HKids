@@ -20,6 +20,7 @@ This repository now includes:
 - retrieval, workflow, feedback, and administration layers
 - multi-agent administration with 4 seeded prototype agents
 - agent-aware conversations, AI usage tracking, feedback, and generated documents
+- enterprise knowledge, prompt, DMS, observability, evaluation, security, vector, and workflow governance modules
 
 ## Architecture
 
@@ -118,7 +119,7 @@ Copy `apps/api/.env.example` to `apps/api/.env`.
 npm install
 cp apps/api/.env.example apps/api/.env
 # Edit DATABASE_URL / DB_* and ANTHROPIC_API_KEY
-npm run db:ensure   # creates DB + applies migrations 001–011 (requires Postgres)
+npm run db:ensure   # creates DB + applies migrations 001–020 (requires Postgres)
 npm run dev
 ```
 
@@ -132,6 +133,7 @@ If Postgres is not available yet, omit `DATABASE_URL` / `DB_*` and the API falls
 ```bash
 npm install
 npm run lint
+npm run typecheck
 npm test
 npm run build
 npm run test:e2e

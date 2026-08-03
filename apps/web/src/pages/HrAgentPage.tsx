@@ -129,7 +129,7 @@ export default function HrAgentPage() {
       const result = await generateHrDocument({
         instruction,
         documentType: type,
-        title: `${type.replaceAll('_', ' ')} draft`,
+        title: `${type.replace(/_/g, ' ')} draft`,
       });
       setSelectedDocumentId(result.document.id);
       setSection('documents');
@@ -492,7 +492,7 @@ export default function HrAgentPage() {
       section === 'offboarding' ? (
         <Panel className="p-6">
           <h2 className="font-display text-xl font-semibold text-white">
-            {section.replaceAll('_', ' ')}
+            {section.replace(/_/g, ' ')}
           </h2>
           <p className="mt-2 text-sm text-slate-400">
             Generate specialized HR drafts. Everything remains editable until manager approval.
@@ -517,7 +517,7 @@ export default function HrAgentPage() {
                   void handleGenerate(type);
                 }}
               >
-                Generate {type.replaceAll('_', ' ')}
+                Generate {type.replace(/_/g, ' ')}
               </Button>
             ))}
           </div>
@@ -654,7 +654,7 @@ export default function HrAgentPage() {
             </div>
           </Panel>
 
-          {selectedDocument && section !== 'leave' ? (
+          {selectedDocument ? (
             <Panel className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

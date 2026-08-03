@@ -38,7 +38,7 @@ Short index for day-2 operations. Detailed procedures live in the docs below.
 
 1. Restore latest backup ([Backup-Restore.md](./Backup-Restore.md))
 2. Re-apply environment / runtime secrets
-3. Restart API (migrations apply on startup; `schema_migrations` tracks 001–009)
+3. Restart API (migrations apply on startup; `schema_migrations` tracks 001–020)
 4. Verify health, admin login, agents, and Claude status
 
 For agent administration, prompts, documents, and training steps, use [Administration.md](./Administration.md) and [DELIVERY_CHECKLIST.md](./DELIVERY_CHECKLIST.md).

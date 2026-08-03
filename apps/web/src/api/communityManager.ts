@@ -2,16 +2,43 @@ import { apiRequest, getAccessToken } from './client';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
+interface EntityResult {
+  id: string;
+}
+
+interface CommunityManagerBootstrap {
+  posts?: Array<EntityResult & Record<string, unknown>>;
+  campaigns?: Array<Record<string, unknown>>;
+  library?: Array<Record<string, unknown>>;
+  stats?: Record<string, unknown>;
+  guidelines?: Record<string, unknown>;
+  prompts?: Array<Record<string, unknown>>;
+  knowledgeDocuments?: Array<Record<string, unknown>>;
+  platforms?: string[];
+  tones?: string[];
+  contentTypes?: string[];
+}
+
+interface CommunityManagerSearchResponse {
+  items: Array<EntityResult & { type: string; title: string }>;
+}
+
+interface CommunityManagerGenerationResponse {
+  post: EntityResult;
+}
+
 export async function getCommunityManagerBootstrap() {
-  return apiRequest('/api/community-manager/bootstrap');
+  return apiRequest<CommunityManagerBootstrap>('/api/community-manager/bootstrap');
 }
 
 export async function getCommunityManagerDashboard() {
-  return apiRequest('/api/community-manager/dashboard');
+  return apiRequest<Record<string, unknown>>('/api/community-manager/dashboard');
 }
 
 export async function searchCommunityManager(query: string) {
-  return apiRequest(`/api/community-manager/search?q=${encodeURIComponent(query)}`);
+  return apiRequest<CommunityManagerSearchResponse>(
+    `/api/community-manager/search?q=${encodeURIComponent(query)}`
+  );
 }
 
 export async function getHashtagSuggestions(params: {
@@ -20,22 +47,22 @@ export async function getHashtagSuggestions(params: {
   platform?: string;
 }) {
   const query = new URLSearchParams(params as Record<string, string>).toString();
-  return apiRequest(`/api/community-manager/hashtags?${query}`);
+  return apiRequest<{ items: string[] }>(`/api/community-manager/hashtags?${query}`);
 }
 
 export async function listCmCampaigns() {
-  return apiRequest('/api/community-manager/campaigns');
+  return apiRequest<{ items: Array<Record<string, unknown>> }>('/api/community-manager/campaigns');
 }
 
 export async function createCmCampaign(payload: Record<string, unknown>) {
-  return apiRequest('/api/community-manager/campaigns', {
+  return apiRequest<EntityResult>('/api/community-manager/campaigns', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateCmCampaign(id: string, payload: Record<string, unknown>) {
-  return apiRequest(`/api/community-manager/campaigns/${id}`, {
+  return apiRequest<EntityResult>(`/api/community-manager/campaigns/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
@@ -43,55 +70,57 @@ export async function updateCmCampaign(id: string, payload: Record<string, unkno
 
 export async function listCmPosts(filters: Record<string, string> = {}) {
   const query = new URLSearchParams(filters).toString();
-  return apiRequest(`/api/community-manager/posts${query ? `?${query}` : ''}`);
+  return apiRequest<{ items: Array<Record<string, unknown>> }>(
+    `/api/community-manager/posts${query ? `?${query}` : ''}`
+  );
 }
 
 export async function createCmPost(payload: Record<string, unknown>) {
-  return apiRequest('/api/community-manager/posts', {
+  return apiRequest<EntityResult>('/api/community-manager/posts', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateCmPost(id: string, payload: Record<string, unknown>) {
-  return apiRequest(`/api/community-manager/posts/${id}`, {
+  return apiRequest<EntityResult>(`/api/community-manager/posts/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
 }
 
 export async function duplicateCmPost(id: string) {
-  return apiRequest(`/api/community-manager/posts/${id}/duplicate`, { method: 'POST' });
+  return apiRequest<EntityResult>(`/api/community-manager/posts/${id}/duplicate`, { method: 'POST' });
 }
 
 export async function submitCmPostReview(id: string) {
-  return apiRequest(`/api/community-manager/posts/${id}/submit-review`, { method: 'POST' });
+  return apiRequest<EntityResult>(`/api/community-manager/posts/${id}/submit-review`, { method: 'POST' });
 }
 
 export async function approveCmPost(id: string) {
-  return apiRequest(`/api/community-manager/posts/${id}/approve`, { method: 'POST' });
+  return apiRequest<EntityResult>(`/api/community-manager/posts/${id}/approve`, { method: 'POST' });
 }
 
 export async function rejectCmPost(id: string) {
-  return apiRequest(`/api/community-manager/posts/${id}/reject`, { method: 'POST' });
+  return apiRequest<EntityResult>(`/api/community-manager/posts/${id}/reject`, { method: 'POST' });
 }
 
 export async function generateCmContent(payload: Record<string, unknown>) {
-  return apiRequest('/api/community-manager/generate', {
+  return apiRequest<CommunityManagerGenerationResponse>('/api/community-manager/generate', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateCmGuidelines(payload: Record<string, unknown>) {
-  return apiRequest('/api/community-manager/guidelines', {
+  return apiRequest<Record<string, unknown>>('/api/community-manager/guidelines', {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
 }
 
 export async function createCmLibraryItem(payload: Record<string, unknown>) {
-  return apiRequest('/api/community-manager/library', {
+  return apiRequest<EntityResult>('/api/community-manager/library', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

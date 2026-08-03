@@ -73,7 +73,7 @@ Chat messages automatically call retrieval and inject ranked context into the pr
 |----------|---------|
 | `EMBEDDING_PROVIDER` | `mock` |
 | `EMBEDDING_MODEL` | `mock-hash-v1` |
-| `OPENAI_API_KEY` | Present for future use; live path uses hash embeddings |
+| `OPENAI_API_KEY` | Required only when `EMBEDDING_PROVIDER=openai`; default path uses hash embeddings |
 
 ## Related docs
 

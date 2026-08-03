@@ -82,6 +82,22 @@ Protected routers also run `authorizeAccess` (RBAC).
 |--------|------|
 | POST | `/api/retrieval/search` | Employee+ |
 
+## Enterprise module route families
+
+The implementation also exposes enterprise module routers beyond the legacy catalog endpoints:
+
+| Prefix | Main capabilities |
+|--------|-------------------|
+| `/api/community-manager` | Bootstrap, dashboard, search, hashtags, campaigns, posts, generation, review/approve/reject, guidelines, library, export |
+| `/api/sales-agent` | Bootstrap, dashboard, analytics, search, companies, prospects, products, deals, quotations, commercial documents, generation, review/approve/reject, export |
+| `/api/hr-agent` | Bootstrap, dashboard, analytics, search, employees, candidates, job descriptions, leave recommendations/decisions, absences, HR documents, review/approve/reject, export |
+| `/api/knowledge` | Collections, document lifecycle, versions, links, tags, bulk actions, import/export, vector stats and indexing jobs |
+| `/api/prompt-platform` | Libraries, prompt lifecycle, versions, links, compare/restore/duplicate, review/publish/archive, playground, feedback suggestions |
+| `/api/dms` | Folders, upload sessions, uploads, document detail/download, ACL, move, lifecycle, import/export, audit, vector reindexing |
+| `/api/observability` | Overview, realtime, usage, logs, health, analytics, timeline, alerts, snapshots, exports |
+| `/api/evaluation` | Dashboards, history, benchmarks, prompt/knowledge/workflow/feedback evaluation, suites, alerts, suggestions, exports |
+| `/api/workflows` | Definitions, templates, policies, simulation, analytics, dashboard, approval tasks, delegations, escalations, SLA, versioning |
+
 ## Feedback
 
 | Method | Path | Write: Employee+ |

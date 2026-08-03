@@ -26,6 +26,7 @@ First setup user is created as `super_admin`.
 
 - `helmet()` enabled; `X-Powered-By` disabled
 - CORS restricted to `CLIENT_URL`
+- Static nginx config adds frame, MIME, referrer, permissions, and Content Security Policy headers
 - JSON body size limit (`JSON_BODY_LIMIT`, default `1mb`)
 - Zod validation on mutating routes (`validate` middleware)
 

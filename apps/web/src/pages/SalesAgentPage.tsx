@@ -123,7 +123,7 @@ export default function SalesAgentPage() {
         instruction,
         documentType,
         customerName,
-        title: `${documentType.replaceAll('_', ' ')} — ${customerName}`,
+        title: `${documentType.replace(/_/g, ' ')} — ${customerName}`,
       });
       setSelectedDocumentId(result.document.id);
       setSection('documents');
@@ -558,7 +558,7 @@ export default function SalesAgentPage() {
             </div>
           </Panel>
 
-          {selectedQuotation && section !== 'documents' ? (
+          {selectedQuotation ? (
             <Panel className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

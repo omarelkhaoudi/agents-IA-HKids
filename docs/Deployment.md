@@ -23,7 +23,7 @@ npm run dev
 - Web: `http://localhost:5173`
 - API: `http://localhost:3001`
 
-`npm run db:ensure` creates the configured database if it is missing (via the Node `pg` driver — `psql` is optional) and applies migrations `001`–`011`. Migrations also run automatically on API startup via `runMigrations` into `schema_migrations`.
+`npm run db:ensure` creates the configured database if it is missing (via the Node `pg` driver — `psql` is optional) and applies migrations `001`–`020`. Migrations also run automatically on API startup via `runMigrations` into `schema_migrations`.
 
 If `DATABASE_URL` / `DB_*` are unset in development, the API uses in-memory PostgreSQL (`pg-mem`) so the UI can start without a local server. Prefer a real Postgres for persistent CRM/content data.
 
@@ -133,6 +133,7 @@ curl -s http://localhost:3001/api/health
 curl -s http://localhost:3001/api/ready
 npm test
 npm run lint
+npm run typecheck
 ```
 
 ## Related docs

@@ -22,7 +22,7 @@ There is no shared `packages/` library; apps are linked via npm workspaces (`app
                     ┌───────────────────────────────┼───────────────────────────────┐
                     ▼                               ▼                               ▼
              PostgreSQL                    AI Gateway                         Retrieval
-          (migrations 001–009)           (Claude live;                  (hybrid keyword +
+          (migrations 001–020)           (Claude live;                  (hybrid keyword +
            schema_migrations            OpenAI/Gemini/Ollama              semantic, mock
                                          stubs reserved)                    embeddings)
 ```
@@ -38,13 +38,13 @@ There is no shared `packages/` library; apps are linked via npm workspaces (`app
 | Retrieval | `services/retrieval/` | Index, chunk, hybrid search, context ranking |
 | Repositories | `repositories/` | PostgreSQL persistence |
 | Runtimes | `runtime/*.js` | Wire services at startup |
-| Migrations | `database/migrations/` | Schema `001`–`009`, tracked in `schema_migrations` |
+| Migrations | `database/migrations/` | Schema `001`–`020`, tracked in `schema_migrations` |
 
-Startup order (`apps/api/src/index.js`): auth + migrations → content catalog seed → workflows → admin agents/settings → setup state.
+Startup order (`apps/api/src/index.js`): auth + migrations → content catalog seed → retrieval refresh → workflows → admin/setup → agent workspaces → observability → security → evaluation.
 
 ## Multi-agent model
 
-Four seeded agents (migration `009` + admin runtime blueprints):
+Four seeded agents (integrity migration + admin runtime blueprints):
 
 | Code | Name |
 |------|------|

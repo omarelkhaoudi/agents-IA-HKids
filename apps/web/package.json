@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "test": "vitest run",
-    "preview": "vite preview"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --dir src --environment jsdom --configLoader runner",
+    "preview": "vite preview --configLoader runner"
   },
   "dependencies": {
     "dompurify": "^3.4.12",

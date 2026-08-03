@@ -7,10 +7,13 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w @hkids/web\" \"npm run dev -w @hkids/api\"",
+    "dev:e2e": "concurrently \"npm run dev -w @hkids/api\" \"npm run dev -w @hkids/web -- --host 127.0.0.1 --port 5174 --strictPort\"",
     "build": "npm run build -w @hkids/web && npm run build -w @hkids/api",
     "lint": "npm run lint -w @hkids/web && npm run lint -w @hkids/api",
+    "typecheck": "npm run typecheck -w @hkids/web",
+    "quality:gates": "npm run lint && npm run typecheck && npm test && npm run build",
     "test": "npm run test -w @hkids/api && npm run test -w @hkids/web",
-    "test:e2e": "playwright test",
+    "test:e2e": "node ./scripts/run-e2e.mjs",
     "db:ensure": "npm run db:ensure -w @hkids/api",
     "backup": "powershell -ExecutionPolicy Bypass -File ./scripts/backup.ps1",
     "restore": "powershell -ExecutionPolicy Bypass -File ./scripts/restore.ps1",
@@ -30,9 +33,5 @@
     "globals": "^16.3.0",
     "pg-mem": "^3.0.14",
     "prettier": "^3.6.2"
-  },
-  "dependencies": {
-    "docx": "^9.7.1",
-    "pdf-lib": "^1.17.1"
   }
 }
