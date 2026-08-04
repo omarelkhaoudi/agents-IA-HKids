@@ -315,6 +315,21 @@ export function authorizeAccess(request, response, next) {
     return;
   }
 
+  if (path.startsWith('/training')) {
+    if (!hasMinimumRole(role, ROLES.EMPLOYEE)) {
+      deny(response);
+      return;
+    }
+
+    if (writeRequest && !hasMinimumRole(role, ROLES.MANAGER)) {
+      deny(response);
+      return;
+    }
+
+    next();
+    return;
+  }
+
   if (writeRequest && role === ROLES.READ_ONLY) {
     deny(response);
     return;

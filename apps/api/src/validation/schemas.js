@@ -1240,6 +1240,30 @@ export const hrGenerateBodySchema = z.object({
   conversationId: idSchema.optional().nullable(),
 });
 
+export const trainingCourseBodySchema = z.object({
+  title: shortText,
+  description: longText.optional(),
+  category: shortText.optional(),
+  status: z.enum(['draft', 'published', 'archived']).optional(),
+  tags: z.array(z.string().trim().max(120)).max(40).optional(),
+  durationHours: z.number().min(0).max(999).optional(),
+  prerequisites: z.array(z.string().trim().max(120)).max(40).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const trainingSessionBodySchema = z.object({
+  courseId: idSchema,
+  title: shortText,
+  description: longText.optional(),
+  scheduledAt: z.string().trim().max(50).optional().nullable(),
+  durationMinutes: z.number().int().min(1).max(1440).optional(),
+  instructor: shortText.optional(),
+  location: shortText.optional(),
+  capacity: z.number().int().min(0).max(1000).optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
 export const hrGenerateJobBodySchema = z.object({
   instruction: longText.optional(),
   title: shortText.optional(),

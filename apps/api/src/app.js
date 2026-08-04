@@ -27,6 +27,7 @@ import setupRouter from './routes/setup.routes.js';
 import communityManagerRouter from './routes/community-manager.routes.js';
 import salesAgentRouter from './routes/sales-agent.routes.js';
 import hrAgentRouter from './routes/hr-agent.routes.js';
+import trainingCenterRouter from './routes/training-center.routes.js';
 import workflowRouter from './routes/workflow.routes.js';
 
 const protectedMiddleware = [authenticate, tenantContextMiddleware, authorizeAccess];
@@ -72,6 +73,7 @@ export function createApp() {
   app.use('/api', protectedMiddleware, promptPlatformRouter);
   app.use('/api', protectedMiddleware, dmsRouter);
   app.use('/api', protectedMiddleware, retrievalRouter);
+  app.use('/api', protectedMiddleware, trainingCenterRouter);
   app.use('/api', protectedMiddleware, workflowRouter);
 
   app.use(notFoundHandler);
