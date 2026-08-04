@@ -467,7 +467,7 @@ export class RetrievalService {
       options.topK || env.vectorTopK || 10
     );
     const rankedCandidates = dedupeByChunkId(
-      this.contextRanker.rank(candidates, options.topK || 5)
+      this.contextRanker.rank(candidates, options.topK || 5, options)
     );
 
     return this.buildResponse(normalizedQuestion, rankedCandidates, 'hybrid-semantic-keyword', {

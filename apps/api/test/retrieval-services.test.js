@@ -116,7 +116,7 @@ test('ContextRanker sorts candidates by normalized final score', () => {
   const candidates = [
     {
       chunk: { id: 'a', chunkNumber: 1, content: 'alpha', estimatedTokens: 5 },
-      document: { ...sampleDocument, updatedDate: '01 Jan 2024', priority: 1 },
+      document: { ...sampleDocument, updatedDate: '01 Jan 2024', priority: 1, status: 'draft' },
       matchSignals: {
         contentMatches: 1,
         titleMatches: 0,
@@ -129,7 +129,7 @@ test('ContextRanker sorts candidates by normalized final score', () => {
     },
     {
       chunk: { id: 'b', chunkNumber: 2, content: 'beta', estimatedTokens: 5 },
-      document: { ...sampleDocument, priority: 3 },
+      document: { ...sampleDocument, priority: 3, status: 'active', tags: ['enrollment', 'policy'] },
       matchSignals: {
         contentMatches: 2,
         titleMatches: 1,
@@ -146,6 +146,79 @@ test('ContextRanker sorts candidates by normalized final score', () => {
 
   assert.equal(ranked[0].chunk.id, 'b');
   assert.ok(ranked[0].finalScore >= ranked[1].finalScore);
+  assert.ok(ranked[0].confidence >= ranked[1].confidence);
+});
+
+test('ContextRanker increases freshness for more recent documents', () => {
+  const ranker = new ContextRanker();
+  const candidates = [
+    {
+      chunk: { id: 'old', chunkNumber: 1, content: 'legacy policy', estimatedTokens: 5 },
+      document: { ...sampleDocument, updatedDate: '01 Jan 2024', priority: 2, status: 'active' },
+      matchSignals: { tagMatches: 0 },
+      keywordScore: 2,
+      semanticScore: 0.5,
+    },
+    {
+      chunk: { id: 'new', chunkNumber: 2, content: 'recent policy', estimatedTokens: 5 },
+      document: { ...sampleDocument, updatedDate: new Date().toISOString(), priority: 2, status: 'active' },
+      matchSignals: { tagMatches: 0 },
+      keywordScore: 2,
+      semanticScore: 0.5,
+    },
+  ];
+
+  const ranked = ranker.rank(candidates, 2);
+  assert.equal(ranked[0].chunk.id, 'new');
+  assert.ok(ranked[0].freshnessScore > ranked[1].freshnessScore);
+});
+
+test('ContextRanker boosts metadata score for tags, language, type, and workflow state', () => {
+  const ranker = new ContextRanker();
+  const candidates = [
+    {
+      chunk: { id: 'plain', chunkNumber: 1, content: 'plain text', estimatedTokens: 5, metadata: { tags: ['misc'], language: 'en', type: 'PDF', status: 'draft' } },
+      document: { ...sampleDocument, updatedDate: '01 Jan 2025', priority: 2, status: 'draft', fileType: 'PDF' },
+      matchSignals: { tagMatches: 0 },
+      keywordScore: 2,
+      semanticScore: 0.4,
+    },
+    {
+      chunk: { id: 'rich', chunkNumber: 2, content: 'policy text', estimatedTokens: 5, metadata: { tags: ['policy'], language: 'en', type: 'PDF', status: 'active' } },
+      document: { ...sampleDocument, updatedDate: '01 Jan 2025', priority: 2, status: 'active', fileType: 'PDF' },
+      matchSignals: { tagMatches: 1 },
+      keywordScore: 2,
+      semanticScore: 0.4,
+    },
+  ];
+
+  const ranked = ranker.rank(candidates, 2, { language: 'en', fileType: 'PDF' });
+  assert.equal(ranked[0].chunk.id, 'rich');
+  assert.ok(ranked[0].metadataScore > ranked[1].metadataScore);
+});
+
+test('ContextRanker honors agent affinity for agent-aware ranking', () => {
+  const ranker = new ContextRanker();
+  const candidates = [
+    {
+      chunk: { id: 'other', chunkNumber: 1, content: 'financial update', estimatedTokens: 5, metadata: { tags: ['finance'], language: 'en', type: 'PDF', owner: 'Finance' } },
+      document: { ...sampleDocument, category: 'Administration', updatedDate: '01 Jan 2026', priority: 2, status: 'active', fileType: 'PDF' },
+      matchSignals: { tagMatches: 0 },
+      keywordScore: 2,
+      semanticScore: 0.6,
+    },
+    {
+      chunk: { id: 'sales', chunkNumber: 2, content: 'quotation discount rules', estimatedTokens: 5, metadata: { tags: ['quotation', 'pricing'], language: 'en', type: 'PDF', owner: 'Sales' } },
+      document: { ...sampleDocument, category: 'Sales', updatedDate: '01 Jan 2026', priority: 2, status: 'active', fileType: 'PDF' },
+      matchSignals: { tagMatches: 1 },
+      keywordScore: 2,
+      semanticScore: 0.6,
+    },
+  ];
+
+  const ranked = ranker.rank(candidates, 2, { agentCode: 'sales-agent' });
+  assert.equal(ranked[0].chunk.id, 'sales');
+  assert.ok(ranked[0].confidence >= ranked[1].confidence);
 });
 
 test('RetrievalService returns structured context and ranked chunks', () => {

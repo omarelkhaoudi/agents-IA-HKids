@@ -17,6 +17,9 @@ export interface RetrievedChunk {
   cosineSimilarity: number;
   semanticScore: number;
   keywordScore: number;
+  metadataScore?: number;
+  freshnessScore?: number;
+  confidence?: number;
   finalScore: number;
   rankingScore: number;
 }
@@ -29,4 +32,6 @@ export interface RetrievalSearchResponse {
   retrievalStrategy: string;
   estimatedTokens: number;
   assembledContext: string;
+  confidence?: number;
+  relevance?: number;
 }
